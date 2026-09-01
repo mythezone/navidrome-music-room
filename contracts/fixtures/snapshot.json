@@ -1,0 +1,62 @@
+{
+  "room": {
+    "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+    "name": "Friday Listening",
+    "ownerUsername": "admin",
+    "ownerDisplayName": "Admin",
+    "status": "open",
+    "queueLimit": 20,
+    "playbackMode": "fifo",
+    "musicFolderIDs": [1],
+    "preloadNextTrack": true,
+    "capabilities": {
+      "chat": false,
+      "stickers": false,
+      "vip": false,
+      "statistics": false,
+      "rankings": false,
+      "achievements": false,
+      "uploads": false,
+      "onlineSources": false,
+      "invites": true,
+      "queue": true,
+      "history": true
+    },
+    "onlineCount": 1,
+    "createdAt": "2026-09-01T10:00:00Z",
+    "updatedAt": "2026-09-01T10:00:00Z"
+  },
+  "self": {
+    "username": "listener",
+    "displayName": "Listener",
+    "role": "member",
+    "active": true,
+    "online": true,
+    "joinedAt": "2026-09-01T10:02:00Z",
+    "lastSeenAt": "2026-09-01T10:02:00Z"
+  },
+  "members": [],
+  "queue": [],
+  "playback": {
+    "revision": 8,
+    "serverTime": "2026-09-01T10:03:00Z",
+    "status": "playing",
+    "pausedForEmpty": false,
+    "positionSeconds": 42.25,
+    "anchorServerTime": "2026-09-01T10:03:00Z",
+    "currentTrack": {
+      "id": "nd-track-1",
+      "musicFolderID": 1,
+      "albumID": "nd-album-1",
+      "title": "Example Track",
+      "artist": "Example Artist",
+      "album": "Example Album",
+      "durationSeconds": 240,
+      "coverArtID": "nd-track-1"
+    },
+    "contributorUsername": "listener",
+    "contributorDisplayName": "Listener"
+  },
+  "history": [],
+  "generatedAt": "2026-09-01T10:03:00Z"
+}

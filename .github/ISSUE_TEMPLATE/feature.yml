@@ -1,0 +1,22 @@
+name: Feature request
+description: Propose a focused community-core improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes: { label: Problem, description: Describe the user problem rather than only a solution. }
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes: { label: Proposed behavior }
+    validations: { required: true }
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Architecture boundaries
+      options:
+        - label: This does not require anonymous access or proxying media through the gateway.
+          required: true
+        - label: I described any new Navidrome permissions, persistent data, or protocol fields.
+          required: true

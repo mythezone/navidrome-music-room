@@ -1,0 +1,22 @@
+{
+  "license": {
+    "state": "not_installed",
+    "offlineVerification": true
+  },
+  "features": {
+    "rooms": true,
+    "invites": true,
+    "presence": true,
+    "synchronizedPlayback": true,
+    "queue": true,
+    "history": true,
+    "chat": false,
+    "stickers": false,
+    "vip": false,
+    "statistics": false,
+    "rankings": false,
+    "achievements": false,
+    "uploads": false,
+    "onlineSources": false
+  }
+}

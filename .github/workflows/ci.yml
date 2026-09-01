@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: gateway/go.sum
+      - name: Format
+        run: test -z "$(gofmt -l gateway)"
+      - name: Unit and API tests
+        working-directory: gateway
+        run: go test -coverprofile=coverage.out ./...
+      - name: Race tests
+        working-directory: gateway
+        run: go test -race ./...
+      - name: Vet
+        working-directory: gateway
+        run: go vet ./...
+      - name: Dependency vulnerability scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          cd gateway
+          govulncheck ./...
+
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: plugin/go.sum
+      - name: Install verified TinyGo 0.41.1
+        run: |
+          curl --http1.1 -fsSL --retry 5 --retry-all-errors -o /tmp/tinygo.tar.gz https://github.com/tinygo-org/tinygo/releases/download/v0.41.1/tinygo0.41.1.linux-amd64.tar.gz
+          echo 'e156d1d93a376eef639a4143d13be07e8c463fb6cf2d7d447698ed4474d23e91  /tmp/tinygo.tar.gz' | sha256sum -c -
+          sudo mkdir -p /opt/tinygo
+          sudo tar -xzf /tmp/tinygo.tar.gz -C /opt/tinygo --strip-components=1
+          echo /opt/tinygo/bin >> "$GITHUB_PATH"
+      - name: Host-stub tests
+        working-directory: plugin
+        run: go test ./...
+      - name: Build .ndp
+        run: ./script/build-plugin.sh 0.1.0-ci
+      - name: Validate with minimum Navidrome
+        run: docker run --rm -v "$PWD/dist:/dist:ro" deluan/navidrome:0.63.2 plugin validate /dist/navidrome-music-room.ndp
+      - name: Validate with latest stable Navidrome
+        run: docker run --rm -v "$PWD/dist:/dist:ro" deluan/navidrome:latest plugin validate /dist/navidrome-music-room.ndp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin
+          path: dist/navidrome-music-room.ndp
+
+  contracts-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON fixtures and YAML syntax
+        run: |
+          find contracts/fixtures -name '*.json' -print0 | xargs -0 -n1 jq empty
+          ruby -e "require 'yaml'; YAML.load_file('contracts/openapi.yaml', aliases: true)"
+      - name: Lint OpenAPI
+        run: npx --yes @redocly/cli@1.34.5 lint contracts/openapi.yaml --extends=minimal
+      - name: Validate Compose
+        env:
+          NAVIDROME_PUBLIC_URL: https://music.example.test
+          MUSIC_ROOM_PUBLIC_URL: https://rooms.example.test
+          MUSIC_ROOM_PLUGIN_PAIRING_TOKEN: 0123456789abcdef0123456789abcdef
+        run: docker compose config --quiet
+
+  container:
+    runs-on: ubuntu-latest
+    needs: [gateway, plugin, contracts-and-deploy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: navidrome-music-room:ci
+          build-args: VERSION=0.1.0-ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Inspect image as non-root
+        run: docker image inspect navidrome-music-room:ci --format '{{json .Config.User}}' | grep -q 65532
+      - name: Runtime and persistent-data smoke test
+        run: |
+          container=$(docker run --detach --rm \
+            --tmpfs /data:rw,exec,uid=65532,gid=65532,mode=0700 \
+            -e MUSIC_ROOM_DATA_DIR=/data \
+            -e MUSIC_ROOM_NAVIDROME_INTERNAL_URL=http://127.0.0.1:9 \
+            -e MUSIC_ROOM_NAVIDROME_PUBLIC_URL=https://music.example.test \
+            -e MUSIC_ROOM_PUBLIC_URL=https://rooms.example.test \
+            -e MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=0123456789abcdef0123456789abcdef \
+            navidrome-music-room:ci)
+          trap 'docker stop "$container" >/dev/null' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec "$container" /opt/music-room/release/music-room-gateway --healthcheck; then
+              docker exec "$container" test -f /data/rooms.sqlite3
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container"
+          exit 1
+      - name: End-to-end with minimum Navidrome
+        env:
+          MUSIC_ROOM_E2E_IMAGE: navidrome-music-room:ci
+        run: ./script/integration-navidrome.sh 0.63.2
+      - name: End-to-end with latest stable Navidrome
+        env:
+          MUSIC_ROOM_E2E_IMAGE: navidrome-music-room:ci
+        run: ./script/integration-navidrome.sh latest

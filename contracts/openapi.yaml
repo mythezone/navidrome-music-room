@@ -1,0 +1,820 @@
+openapi: 3.1.0
+info:
+  title: Navidrome Music Room Gateway API
+  version: 1.0.0
+  license:
+    name: GPL-3.0-only
+    identifier: GPL-3.0-only
+  description: |
+    Versioned room coordination API for MusicMate. Media bytes never pass through this API;
+    clients stream audio, artwork, and lyrics directly from Navidrome with their own credentials.
+servers:
+  - url: https://rooms.example.com/api/v1
+security:
+  - roomSession: []
+tags:
+  - name: Auth
+  - name: Rooms
+  - name: Invitations
+  - name: Playback
+  - name: Entitlements
+  - name: Updates
+paths:
+  /discovery:
+    get:
+      tags: [Auth]
+      summary: Resolve the Navidrome public URL for an HTTPS invitation link
+      security: []
+      responses:
+        '200':
+          description: Public, non-secret gateway connection metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Discovery' }
+  /auth/exchange:
+    post:
+      tags: [Auth]
+      summary: Exchange an OpenSubsonic salt/token proof for a 15-minute room session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthProof'
+      responses:
+        '200':
+          description: Authenticated room session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthExchange'
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /auth/session:
+    delete:
+      tags: [Auth]
+      summary: Revoke the current in-memory room session
+      responses:
+        '204': { description: Session revoked }
+        '401': { $ref: '#/components/responses/Error' }
+  /rooms:
+    get:
+      tags: [Rooms]
+      summary: List rooms visible to the current user
+      responses:
+        '200':
+          description: Rooms where the user is a member; administrators see all rooms
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rooms]
+                properties:
+                  rooms:
+                    type: array
+                    items: { $ref: '#/components/schemas/Room' }
+    post:
+      tags: [Rooms]
+      summary: Create a room
+      description: Requires both Navidrome adminRole and plugin authorization.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoomCreate'
+      responses:
+        '201':
+          description: Room created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Room' }
+        '403': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}:
+    parameters:
+      - $ref: '#/components/parameters/RoomID'
+    get:
+      tags: [Rooms]
+      summary: Read one room
+      responses:
+        '200':
+          description: Room
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Room' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Rooms]
+      summary: Update a room as owner or administrator
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomPatch' }
+      responses:
+        '200':
+          description: Updated room
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Room' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Rooms]
+      summary: Permanently delete a room as owner or administrator
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '204': { description: Room deleted }
+        '403': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/close:
+    post:
+      tags: [Rooms]
+      summary: Close a room to new joins and queue changes
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Closed room
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Room' }
+        '403': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/reopen:
+    post:
+      tags: [Rooms]
+      summary: Reopen a room when the plugin lease is healthy
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Reopened room
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Room' }
+        '503': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/invites:
+    parameters: [{ $ref: '#/components/parameters/RoomID' }]
+    get:
+      tags: [Invitations]
+      summary: List invitation metadata without secrets
+      responses:
+        '200':
+          description: Invitations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invites:
+                    type: array
+                    items: { $ref: '#/components/schemas/Invite' }
+    post:
+      tags: [Invitations]
+      summary: Create a revocable invitation
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string, maxLength: 80 }
+                expiresAt: { type: string, format: date-time }
+                maxUses: { type: integer, minimum: 1, maximum: 10000, default: 20 }
+                singleUse: { type: boolean, default: false }
+      responses:
+        '201':
+          description: Secret is returned once; only its SHA-256 digest is persisted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InviteWithSecret' }
+  /rooms/{room_id}/invites/{invite_id}:
+    delete:
+      tags: [Invitations]
+      summary: Revoke an invitation without removing existing members
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - name: invite_id
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/Identifier' }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Invitation revoked }
+        '404': { $ref: '#/components/responses/Error' }
+  /invites/redeem:
+    post:
+      tags: [Invitations]
+      summary: Redeem an invitation into persistent room membership
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roomID, invite]
+              properties:
+                roomID: { $ref: '#/components/schemas/Identifier' }
+                invite: { type: string, minLength: 32, maxLength: 128 }
+      responses:
+        '200':
+          description: Membership created or already active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member: { $ref: '#/components/schemas/Member' }
+                  room: { $ref: '#/components/schemas/Room' }
+        '403': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/members:
+    get:
+      tags: [Rooms]
+      summary: List persistent members with current presence
+      parameters: [{ $ref: '#/components/parameters/RoomID' }]
+      responses:
+        '200':
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  members:
+                    type: array
+                    items: { $ref: '#/components/schemas/Member' }
+  /rooms/{room_id}/members/{username}:
+    delete:
+      tags: [Rooms]
+      summary: Remove a member and disconnect their room WebSockets
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - name: username
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Member removed }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/join:
+    post:
+      tags: [Rooms]
+      summary: Enter a room after membership and library checks
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Joined }
+        '403': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/leave:
+    post:
+      tags: [Rooms]
+      summary: Deactivate the current membership
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Left room }
+        '409': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/snapshot:
+    get:
+      tags: [Rooms]
+      summary: Read the authoritative room snapshot
+      parameters: [{ $ref: '#/components/parameters/RoomID' }]
+      responses:
+        '200':
+          description: Snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Snapshot' }
+  /rooms/{room_id}/history:
+    get:
+      tags: [Playback]
+      summary: Read playback history
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200': { description: History page }
+  /rooms/{room_id}/playback:
+    post:
+      tags: [Playback]
+      summary: Change authoritative playback as owner or administrator
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command, expectedRevision]
+              properties:
+                command: { type: string, enum: [play, pause, seek, next, stop] }
+                expectedRevision: { type: integer, format: int64, minimum: 0 }
+                positionSeconds: { type: number, minimum: 0 }
+      responses:
+        '200':
+          description: New playback state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Playback' }
+        '409':
+          description: Includes `details.latest` when code is `revision_conflict`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /rooms/{room_id}/queue/tracks:
+    post:
+      tags: [Playback]
+      summary: Add an accessible Navidrome track to the member's pending queue
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [track]
+              properties:
+                track: { $ref: '#/components/schemas/TrackRef' }
+      responses:
+        '201': { description: Queue entry created }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/queue/{queue_id}:
+    delete:
+      tags: [Playback]
+      summary: Remove one's own pending entry, or any entry as a manager
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - name: queue_id
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/Identifier' }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Queue entry removed }
+        '403': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/queue/order:
+    put:
+      tags: [Playback]
+      summary: Reorder the complete queue as a manager
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [queueIDs]
+              properties:
+                queueIDs:
+                  type: array
+                  maxItems: 1000
+                  items: { $ref: '#/components/schemas/Identifier' }
+      responses:
+        '200': { description: Reordered queue }
+        '409': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/ws-ticket:
+    post:
+      tags: [Rooms]
+      summary: Create a one-use WebSocket ticket valid for 60 seconds
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Ticket and WebSocket URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ticket, expiresAt, webSocketURL]
+                properties:
+                  ticket: { type: string }
+                  expiresAt: { type: string, format: date-time }
+                  webSocketURL: { type: string, format: uri }
+  /rooms/{room_id}/ws:
+    get:
+      tags: [Rooms]
+      summary: Upgrade to the room WebSocket
+      description: |
+        The `ticket` query value is one-use and expires after 60 seconds. Server events are
+        `snapshot`, `playback`, `queue`, `history`, `presence`, `room_updated`, and `error`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - { name: ticket, in: query, required: true, schema: { type: string } }
+      responses:
+        '101': { description: WebSocket upgraded }
+        '401': { $ref: '#/components/responses/Error' }
+  /entitlements:
+    get:
+      tags: [Entitlements]
+      summary: Return free and locked capabilities
+      responses:
+        '200':
+          description: Offline License state and effective capabilities. Signed claims never enable code absent from the core.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Entitlements' }
+  /admin/diagnostics:
+    get:
+      tags: [Updates]
+      summary: Explicitly export an automatically redacted diagnostic bundle
+      description: Returns aggregate runtime, plugin heartbeat, update, License, and database health only; no URLs, names, room identifiers, invitations, credentials, or row data are included.
+      responses:
+        '200':
+          description: Private JSON attachment generated on demand
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DiagnosticBundle' }
+        '403': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/{locked_feature}:
+    get:
+      tags: [Entitlements]
+      summary: Reserved commercial feature surface
+      description: The community core ships no implementation and always returns the uniform lock envelope.
+      parameters:
+        - $ref: '#/components/parameters/RoomID'
+        - name: locked_feature
+          in: path
+          required: true
+          schema: { type: string, enum: [chat, stickers, vip, statistics, rankings, achievements] }
+      responses:
+        '402':
+          description: Feature is License-locked and absent from the community core
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /admin/updates:
+    get:
+      tags: [Updates]
+      summary: Read local updater state as a Navidrome administrator
+      responses:
+        '200':
+          description: Update state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, repository, managedByLauncher, actions]
+                properties:
+                  status: { $ref: '#/components/schemas/UpdateStatus' }
+                  repository: { type: string }
+                  managedByLauncher: { type: boolean }
+                  actions: { type: array, items: { type: string, enum: [check, stage, install, rollback] } }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Updates]
+      summary: Check, stage, install, or roll back a signed GitHub release
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [check, stage, install, rollback] }
+                version: { type: string }
+      responses:
+        '200': { description: Check completed }
+        '202': { description: 'Stage, activation, or rollback accepted' }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    roomSession:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-15-minute-room-session
+  parameters:
+    RoomID:
+      name: room_id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Identifier' }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        A caller-generated key retained in memory for 15 minutes. Repeating the same method,
+        path, body, current authorized user, and key replays the original response and adds
+        `Idempotency-Replayed: true`; reusing it for a different request returns 409.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:-]+$'
+  responses:
+    Error:
+      description: Structured error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  schemas:
+    Identifier:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{16,128}$'
+    AuthProof:
+      type: object
+      additionalProperties: false
+      required: [username, salt, token]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 128 }
+        salt: { type: string, pattern: '^[A-Fa-f0-9]{8,64}$' }
+        token: { type: string, pattern: '^[A-Fa-f0-9]{32}$' }
+    Discovery:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, version, gatewayBaseURL, navidromeBaseURL, authenticationMode]
+      properties:
+        apiVersion: { type: string, const: v1 }
+        version: { type: string }
+        gatewayBaseURL: { type: string, format: uri }
+        navidromeBaseURL: { type: string, format: uri }
+        authenticationMode: { type: string, const: opensubsonic-proof-exchange }
+    User:
+      type: object
+      required: [username, displayName, adminRole, musicFolderIDs]
+      properties:
+        username: { type: string }
+        displayName: { type: string }
+        adminRole: { type: boolean }
+        musicFolderIDs:
+          type: array
+          items: { type: integer, minimum: 1 }
+    AuthExchange:
+      type: object
+      required: [sessionToken, expiresAt, user, navidromeBaseURL, gatewayBaseURL, pluginLeaseExpiresAt]
+      properties:
+        sessionToken: { type: string }
+        expiresAt: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/User' }
+        navidromeBaseURL: { type: string, format: uri }
+        gatewayBaseURL: { type: string, format: uri }
+        pluginLeaseExpiresAt: { type: string, format: date-time }
+    RoomCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        queueLimit: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        playbackMode: { type: string, enum: [fifo, fair_random], default: fifo }
+        musicFolderIDs:
+          type: array
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+        preloadNextTrack: { type: boolean, default: true }
+    RoomPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        queueLimit: { type: integer, minimum: 1, maximum: 100 }
+        playbackMode: { type: string, enum: [fifo, fair_random] }
+        musicFolderIDs:
+          type: array
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+        preloadNextTrack: { type: boolean }
+    Capabilities:
+      type: object
+      required: [chat, stickers, vip, statistics, rankings, achievements, uploads, onlineSources, invites, queue, history]
+      properties:
+        chat: { type: boolean, const: false }
+        stickers: { type: boolean, const: false }
+        vip: { type: boolean, const: false }
+        statistics: { type: boolean, const: false }
+        rankings: { type: boolean, const: false }
+        achievements: { type: boolean, const: false }
+        uploads: { type: boolean, const: false }
+        onlineSources: { type: boolean, const: false }
+        invites: { type: boolean, const: true }
+        queue: { type: boolean, const: true }
+        history: { type: boolean, const: true }
+    Room:
+      type: object
+      required: [roomID, name, ownerUsername, ownerDisplayName, status, queueLimit, playbackMode, musicFolderIDs, preloadNextTrack, capabilities, onlineCount, createdAt, updatedAt]
+      properties:
+        roomID: { $ref: '#/components/schemas/Identifier' }
+        name: { type: string }
+        ownerUsername: { type: string }
+        ownerDisplayName: { type: string }
+        status: { type: string, enum: [open, closed] }
+        queueLimit: { type: integer }
+        playbackMode: { type: string, enum: [fifo, fair_random] }
+        musicFolderIDs:
+          type: array
+          items: { type: integer }
+        preloadNextTrack: { type: boolean }
+        capabilities: { $ref: '#/components/schemas/Capabilities' }
+        onlineCount: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Member:
+      type: object
+      required: [username, displayName, role, active, online, joinedAt, lastSeenAt]
+      properties:
+        roomID: { $ref: '#/components/schemas/Identifier' }
+        username: { type: string }
+        displayName: { type: string }
+        role: { type: string, enum: [owner, member] }
+        active: { type: boolean }
+        online: { type: boolean }
+        joinedAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+    Invite:
+      type: object
+      required: [inviteID, roomID, label, expiresAt, maxUses, useCount, createdBy, createdAt]
+      properties:
+        inviteID: { $ref: '#/components/schemas/Identifier' }
+        roomID: { $ref: '#/components/schemas/Identifier' }
+        label: { type: string }
+        expiresAt: { type: string, format: date-time }
+        maxUses: { type: integer }
+        useCount: { type: integer }
+        revokedAt: { type: string, format: date-time }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+    InviteWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/Invite'
+        - type: object
+          required: [invite, shareURL, deepLink]
+          properties:
+            invite: { type: string, readOnly: true }
+            shareURL: { type: string, format: uri }
+            deepLink: { type: string, format: uri }
+    TrackRef:
+      type: object
+      required: [id, musicFolderID, title, artist, album, durationSeconds]
+      properties:
+        id: { type: string }
+        musicFolderID: { type: integer, minimum: 1 }
+        albumID: { type: string }
+        title: { type: string }
+        artist: { type: string }
+        album: { type: string }
+        durationSeconds: { type: number, minimum: 0 }
+        coverArtID: { type: string }
+    QueueEntry:
+      type: object
+      required: [queueID, position, track, contributorUsername, contributorDisplayName, createdAt]
+      properties:
+        queueID: { $ref: '#/components/schemas/Identifier' }
+        position: { type: integer, minimum: 1 }
+        track: { $ref: '#/components/schemas/TrackRef' }
+        contributorUsername: { type: string }
+        contributorDisplayName: { type: string }
+        createdAt: { type: string, format: date-time }
+    Playback:
+      type: object
+      required: [revision, serverTime, status, pausedForEmpty, positionSeconds]
+      properties:
+        revision: { type: integer, format: int64, minimum: 0 }
+        serverTime: { type: string, format: date-time }
+        status: { type: string, enum: [stopped, playing, paused] }
+        pausedForEmpty: { type: boolean }
+        positionSeconds: { type: number, minimum: 0 }
+        anchorServerTime: { type: string, format: date-time }
+        currentTrack: { $ref: '#/components/schemas/TrackRef' }
+        nextTrack: { $ref: '#/components/schemas/TrackRef' }
+        contributorUsername: { type: string }
+        contributorDisplayName: { type: string }
+    Snapshot:
+      type: object
+      required: [room, self, members, queue, playback, history, generatedAt]
+      properties:
+        room: { $ref: '#/components/schemas/Room' }
+        self: { $ref: '#/components/schemas/Member' }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/Member' }
+        queue:
+          type: array
+          items: { $ref: '#/components/schemas/QueueEntry' }
+        playback: { $ref: '#/components/schemas/Playback' }
+        history: { type: array, items: { type: object } }
+        generatedAt: { type: string, format: date-time }
+    LicenseStatus:
+      type: object
+      additionalProperties: false
+      required: [state, offlineVerification]
+      properties:
+        state:
+          type: string
+          enum: [not_installed, verification_unavailable, invalid, not_yet_valid, expired, valid]
+        offlineVerification: { type: boolean, const: true }
+        licenseID: { type: string }
+        subject: { type: string }
+        expiresAt: { type: string, format: date-time }
+        grantedFeatures:
+          type: array
+          uniqueItems: true
+          description: Cryptographically granted claims; effective features remain false until a separately shipped implementation is present.
+          items: { type: string, enum: [chat, stickers, vip, statistics, rankings, achievements] }
+        reason: { type: string }
+    Entitlements:
+      type: object
+      additionalProperties: false
+      required: [license, features]
+      properties:
+        license: { $ref: '#/components/schemas/LicenseStatus' }
+        features:
+          type: object
+          additionalProperties: false
+          required: [rooms, invites, presence, synchronizedPlayback, queue, history, chat, stickers, vip, statistics, rankings, achievements, uploads, onlineSources]
+          properties:
+            rooms: { type: boolean }
+            invites: { type: boolean }
+            presence: { type: boolean }
+            synchronizedPlayback: { type: boolean }
+            queue: { type: boolean }
+            history: { type: boolean }
+            chat: { type: boolean }
+            stickers: { type: boolean }
+            vip: { type: boolean }
+            statistics: { type: boolean }
+            rankings: { type: boolean }
+            achievements: { type: boolean }
+            uploads: { type: boolean }
+            onlineSources: { type: boolean }
+    DiagnosticBundle:
+      type: object
+      additionalProperties: false
+      required: [format, generatedAt, redacted, gateway, configuration, plugin, database, license, update]
+      properties:
+        format: { type: string, const: navidrome-music-room-diagnostics/v1 }
+        generatedAt: { type: string, format: date-time }
+        redacted: { type: boolean, const: true }
+        gateway: { type: object, additionalProperties: true }
+        configuration: { type: object, additionalProperties: true }
+        plugin: { type: object, additionalProperties: true }
+        database:
+          type: object
+          additionalProperties: false
+          required: [quickCheck, schemaVersion, pageCount, pageSize, tableCounts]
+          properties:
+            quickCheck: { type: string }
+            schemaVersion: { type: integer, minimum: 0 }
+            pageCount: { type: integer, minimum: 0 }
+            pageSize: { type: integer, minimum: 0 }
+            tableCounts:
+              type: object
+              additionalProperties: { type: integer, minimum: 0 }
+        license: { type: object, additionalProperties: true }
+        update: { type: object, additionalProperties: true }
+    UpdateStatus:
+      type: object
+      required: [currentVersion, channel, updateAvailable, rollbackAvailable, state]
+      properties:
+        currentVersion: { type: string }
+        channel: { type: string, enum: [stable, beta] }
+        latestVersion: { type: string }
+        updateAvailable: { type: boolean }
+        releaseURL: { type: string, format: uri }
+        checkedAt: { type: string, format: date-time }
+        stagedVersion: { type: string }
+        rollbackVersion: { type: string }
+        rollbackAvailable: { type: boolean }
+        state: { type: string }
+        lastError: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}

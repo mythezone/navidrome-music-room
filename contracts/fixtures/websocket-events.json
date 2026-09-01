@@ -1,0 +1,28 @@
+[
+  {
+    "type": "snapshot",
+    "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+    "serverTime": "2026-09-01T10:03:00Z",
+    "payload": "contracts/fixtures/snapshot.json"
+  },
+  {
+    "type": "playback",
+    "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+    "revision": 9,
+    "serverTime": "2026-09-01T10:03:10Z",
+    "payload": {
+      "revision": 9,
+      "status": "paused",
+      "positionSeconds": 52.25
+    }
+  },
+  {
+    "type": "presence",
+    "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+    "serverTime": "2026-09-01T10:03:11Z",
+    "payload": {
+      "onlineUsernames": ["admin", "listener"],
+      "onlineCount": 2
+    }
+  }
+]

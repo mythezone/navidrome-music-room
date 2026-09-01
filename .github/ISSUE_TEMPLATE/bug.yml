@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible non-security defect
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security vulnerabilities here. Use private vulnerability reporting.
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Gateway, plugin, Navidrome, MusicMate, and deployment type
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction
+      description: Remove tokens, proofs, private URLs, and usernames.
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected behavior }
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual behavior and redacted logs }
+    validations: { required: true }

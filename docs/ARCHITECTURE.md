@@ -1,0 +1,59 @@
+# Architecture
+
+## Boundaries
+
+The `.ndp` bridge has four Navidrome permissions: `users`, `scheduler`, `http`, and `kvstore`. It receives only explicitly authorized usernames/display names/admin flags, runs a recurring callback, sends to fixed local gateway hosts, and stores a schedule ID plus generation counter. It has no music-folder filesystem permission and no write access.
+
+Navidrome v0.63.2's web application uses React 17, Material UI v4,
+react-admin 3, and Vite; plugin configuration is rendered from JSONForms. The
+host does not expose a supported custom-page or player-control slot, so v1 does
+not inject a parallel web application or a second `<audio>` element. A future
+Navidrome panel will follow that host stack only after an official extension
+point exists.
+
+The gateway owns room coordination only. It stores rooms, persistent membership, invitation digests, queue, playback history, security audit records, migration state, and updater state. It does not store Navidrome passwords, OpenSubsonic proofs, permanent stream URLs, or audio bodies.
+
+MusicMate owns long-term credentials and playback. It uses the user's Navidrome account for `search3`, `getAlbum`, `getSong`, `getCoverArt`, `getLyricsBySongId`, and `stream`.
+
+## Trust flow
+
+1. The plugin sends its complete allowlist, configured internal/public endpoints, and monotonic generation using a pairing bearer token. The gateway rejects endpoint drift before accepting the lease.
+   If the plugin KV state is lost, it consumes the gateway's stale-generation
+   response and safely resumes above the stored counter.
+2. A new gateway session requires a heartbeat no older than 90 seconds.
+3. The gateway forwards an OpenSubsonic salt/token proof only to its configured Navidrome internal URL.
+4. `getUser` supplies `adminRole` and accessible folder IDs. The allowlist and Navidrome result must both authorize the user.
+5. The opaque gateway session expires after 15 minutes; its OpenSubsonic proof exists only in memory.
+6. Every request rechecks the current plugin allowlist. Existing sessions tolerate a stale heartbeat for only 60 additional seconds.
+
+## Playback model
+
+The server stores a base position and optional server-time anchor. A playing client's expected position is:
+
+```text
+basePosition + (now - anchorServerTime)
+```
+
+Mutations require `expectedRevision`. A stale request receives `409 revision_conflict` with the latest state. The gateway records only `NavidromeTrackRef`; clients independently turn the ID into a media request. When the final WebSocket leaves, a 15-second timer pauses an active room with a new revision.
+
+Queue selection prevents one contributor from monopolizing playback. FIFO chooses the oldest entry from another contributor when possible. Fair-random chooses a contributor first and then one of that contributor's tracks. The personal pending limit is stored per room.
+
+## Persistence
+
+SQLite lives below the plugin folder but does not share Navidrome's schema. WAL, foreign keys, one writer lock for compound mutations, and transactional migrations are enabled. Current tables are:
+
+- `rooms`
+- `members`
+- `invites`
+- `queue`
+- `playback_history`
+- `security_audit`
+- `plugin_state`
+- `update_state`
+- `schema_migrations`
+
+There are intentionally no chat, statistics, ranking, VIP, or achievement tables in the community v1 schema.
+
+## Deployment model
+
+v1 supports one gateway process. The launcher supervises that process and owns atomic release switching. Redis, distributed locks, cloud relays, and multi-node consensus are intentionally absent.

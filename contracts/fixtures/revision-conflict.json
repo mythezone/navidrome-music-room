@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "revision_conflict",
+    "message": "Playback state has changed",
+    "details": {
+      "latest": {
+        "revision": 12,
+        "serverTime": "2026-09-01T10:04:00Z",
+        "status": "playing",
+        "positionSeconds": 64.5
+      }
+    }
+  }
+}

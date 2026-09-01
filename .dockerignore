@@ -1,0 +1,7 @@
+.git
+.github
+dist
+room-data
+docs
+gateway/coverage.out
+plugin/plugin.wasm

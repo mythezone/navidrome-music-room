@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/mythezone/navidrome-music-room/security/advisories/new
+    about: Report security issues privately.
+  - name: Navidrome plugin documentation
+    url: https://www.navidrome.org/docs/usage/features/plugins/
+    about: Check the official host capabilities and limitations.

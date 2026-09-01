@@ -1,0 +1,124 @@
+{
+  "name": "Navidrome Music Room",
+  "author": "MusicMate Contributors",
+  "version": "0.1.0-dev",
+  "description": "Authorizes Navidrome users and connects MusicMate listening rooms to the local companion gateway.",
+  "website": "https://github.com/mythezone/navidrome-music-room",
+  "config": {
+    "schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "Enable Music Room bridge",
+          "description": "Send the authorized user list and lease heartbeat to the companion gateway.",
+          "default": true
+        },
+        "navidrome_internal_url": {
+          "type": "string",
+          "format": "uri",
+          "title": "Navidrome internal URL",
+          "description": "The fixed URL used by the local gateway for OpenSubsonic authentication, for example http://navidrome:4533. Configure the same value on the gateway.",
+          "default": "http://navidrome:4533"
+        },
+        "navidrome_public_url": {
+          "type": "string",
+          "format": "uri",
+          "title": "Navidrome public URL",
+          "description": "The HTTPS URL MusicMate clients use for audio, artwork and lyrics."
+        },
+        "gateway_internal_url": {
+          "type": "string",
+          "format": "uri",
+          "title": "Gateway internal URL",
+          "description": "Must use an approved local host from the plugin permission list.",
+          "default": "http://music-room-gateway:4534"
+        },
+        "gateway_public_url": {
+          "type": "string",
+          "format": "uri",
+          "title": "Gateway public URL",
+          "description": "The HTTPS URL MusicMate clients use for room REST and WebSocket traffic."
+        },
+        "pairing_token": {
+          "type": "string",
+          "minLength": 32,
+          "title": "Gateway pairing token",
+          "description": "Copy this from room-data/secrets/plugin-pairing-token. It is only sent to the configured local gateway."
+        },
+        "update_channel": {
+          "type": "string",
+          "title": "Update channel",
+          "enum": ["stable", "beta"],
+          "default": "stable"
+        },
+        "license_file": {
+          "type": "string",
+          "title": "Optional License file",
+          "description": "Path relative to the gateway room-data directory (for example secrets/license.json). The gateway verifies its Ed25519 signature offline; commercial implementations remain absent from this release.",
+          "default": ""
+        }
+      },
+      "required": [
+        "navidrome_internal_url",
+        "navidrome_public_url",
+        "gateway_internal_url",
+        "gateway_public_url",
+        "pairing_token"
+      ],
+      "additionalProperties": false
+    },
+    "uiSchema": {
+      "type": "VerticalLayout",
+      "elements": [
+        { "type": "Control", "scope": "#/properties/enabled" },
+        {
+          "type": "Group",
+          "label": "Navidrome",
+          "elements": [
+            { "type": "Control", "scope": "#/properties/navidrome_internal_url" },
+            { "type": "Control", "scope": "#/properties/navidrome_public_url" }
+          ]
+        },
+        {
+          "type": "Group",
+          "label": "Local companion gateway",
+          "elements": [
+            { "type": "Control", "scope": "#/properties/gateway_internal_url" },
+            { "type": "Control", "scope": "#/properties/gateway_public_url" },
+            { "type": "Control", "scope": "#/properties/pairing_token", "options": { "format": "password" } }
+          ]
+        },
+        {
+          "type": "HorizontalLayout",
+          "elements": [
+            { "type": "Control", "scope": "#/properties/update_channel" },
+            { "type": "Control", "scope": "#/properties/license_file" }
+          ]
+        }
+      ]
+    }
+  },
+  "permissions": {
+    "users": {
+      "reason": "Synchronize only the Navidrome users explicitly authorized by an administrator."
+    },
+    "scheduler": {
+      "reason": "Refresh the authorized user list and gateway lease every 30 seconds."
+    },
+    "http": {
+      "reason": "Send authenticated user-list heartbeats only to the local Music Room gateway.",
+      "requiredHosts": [
+        "navidrome-music-room-gateway",
+        "music-room-gateway",
+        "localhost",
+        "127.0.0.1"
+      ]
+    },
+    "kvstore": {
+      "reason": "Store the heartbeat schedule identifier and monotonic sync generation.",
+      "maxSize": "64KB"
+    }
+  }
+}

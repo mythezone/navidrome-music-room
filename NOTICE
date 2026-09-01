@@ -1,0 +1,22 @@
+Navidrome Music Room
+Copyright (C) 2026 Navidrome Music Room contributors
+
+This program is free software licensed under GPL-3.0-only. The complete license
+text is in LICENSE.
+
+The project interoperates with Navidrome and OpenSubsonic but is not an official
+Navidrome project. "Navidrome" is used only to describe compatibility.
+
+The gateway uses these third-party components under their respective licenses:
+
+- gorilla/websocket (BSD-2-Clause)
+- modernc.org/sqlite and its transitive dependencies (BSD-style licenses)
+- SQLite (public domain)
+- Sigstore Cosign distributed in the container image (Apache-2.0)
+
+The .ndp bridge uses Navidrome's Go Plugin Development Kit and Extism Go PDK.
+Redistribution of build artifacts must retain all applicable notices and source
+availability obligations.
+
+MusicMate and FAIO are separate projects. No FAIO room data or media is bundled
+with this repository.

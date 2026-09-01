@@ -1,0 +1,6 @@
+{
+  "version": "0.1.0-dev",
+  "apiVersion": "v1",
+  "minimumNavidromeVersion": "0.63.2",
+  "gatewayPlatforms": ["linux/amd64", "linux/arm64"]
+}
