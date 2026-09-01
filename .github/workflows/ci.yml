@@ -117,7 +117,7 @@ jobs:
             -e MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=0123456789abcdef0123456789abcdef \
             navidrome-music-room:ci)
           trap 'docker stop "$container" >/dev/null' EXIT
-          for attempt in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if docker exec "$container" /opt/music-room/release/music-room-gateway --healthcheck; then
               docker exec "$container" test -f /data/rooms.sqlite3
               exit 0
