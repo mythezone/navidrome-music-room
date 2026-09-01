@@ -56,6 +56,8 @@ MUSIC_ROOM_PUBLIC_URL=https://rooms.example.com
 MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=<至少 32 字符的随机密钥>
 ```
 
+当前开发预览默认跟随已签名的 `beta` 容器标签；稳定版发布后默认频道会切换到 `latest`。生产环境建议始终固定具体版本。
+
 启动：
 
 ```bash

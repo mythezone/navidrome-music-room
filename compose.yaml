@@ -25,7 +25,7 @@ services:
       retries: 10
 
   music-room-gateway:
-    image: ${MUSIC_ROOM_IMAGE:-ghcr.io/mythezone/navidrome-music-room:latest}
+    image: ${MUSIC_ROOM_IMAGE:-ghcr.io/mythezone/navidrome-music-room:beta}
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
     depends_on:

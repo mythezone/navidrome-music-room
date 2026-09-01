@@ -68,6 +68,10 @@ MUSIC_ROOM_PUBLIC_URL=https://rooms.example.com
 MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=<64 random hex characters>
 ```
 
+The developer preview tracks the signed `beta` container tag. Stable releases
+will move the default installation channel to `latest`; pin an exact version in
+production.
+
 Then create writable directories and start both services:
 
 ```bash
