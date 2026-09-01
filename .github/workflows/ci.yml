@@ -30,7 +30,7 @@ jobs:
         run: go vet ./...
       - name: Dependency vulnerability scan
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           cd gateway
           govulncheck ./...
 
@@ -52,6 +52,14 @@ jobs:
       - name: Host-stub tests
         working-directory: plugin
         run: go test ./...
+      - name: Vet
+        working-directory: plugin
+        run: go vet ./...
+      - name: Dependency vulnerability scan
+        working-directory: plugin
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+          govulncheck ./...
       - name: Build .ndp
         run: ./script/build-plugin.sh 0.1.0-ci
       - name: Validate with minimum Navidrome
