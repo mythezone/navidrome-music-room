@@ -6,6 +6,11 @@ updates:
   - package-ecosystem: gomod
     directory: /plugin
     schedule: { interval: weekly }
+    # Navidrome publishes this nested PDK module as a pseudo-version. Dependabot
+    # incorrectly proposes the parent v0.63.2 tag, which does not contain the
+    # nested module. Compatibility updates are tested and pinned manually.
+    ignore:
+      - dependency-name: github.com/navidrome/navidrome/plugins/pdk/go
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
