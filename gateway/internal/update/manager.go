@@ -36,6 +36,7 @@ type Config struct {
 	CurrentVersion string
 	DataDir        string
 	CosignBinary   string
+	TrustedRoot    string
 	IdentityRegex  string
 }
 
@@ -81,6 +82,8 @@ type Pending struct {
 	SBOMSHA256            string    `json:"sbomSHA256"`
 	ProvenanceSHA256      string    `json:"provenanceSHA256"`
 	GatewaySHA256         string    `json:"gatewaySHA256"`
+	CosignSHA256          string    `json:"cosignSHA256"`
+	TrustedRootSHA256     string    `json:"trustedRootSHA256"`
 	PluginSHA256          string    `json:"pluginSHA256"`
 	ReleaseMetadataSHA256 string    `json:"releaseMetadataSHA256"`
 	CreatedAt             time.Time `json:"createdAt"`
@@ -91,6 +94,12 @@ type Pending struct {
 func NewManager(config Config, store StateStore) (*Manager, error) {
 	if !validRepository.MatchString(config.Repository) {
 		return nil, fmt.Errorf("invalid GitHub release repository")
+	}
+	if strings.TrimSpace(config.CosignBinary) == "" || strings.TrimSpace(config.TrustedRoot) == "" {
+		return nil, fmt.Errorf("cosign binary and Sigstore trusted root are required")
+	}
+	if _, err := regexp.Compile("^" + config.IdentityRegex + "$"); err != nil {
+		return nil, fmt.Errorf("invalid update signing identity: %w", err)
 	}
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -257,15 +266,27 @@ func (m *Manager) Stage(ctx context.Context, requestedVersion, channel string) (
 	}
 	gatewayPath := filepath.Join(stagingDir, "music-room-gateway")
 	pluginPath := filepath.Join(stagingDir, "navidrome-music-room.ndp")
-	for _, required := range []string{gatewayPath, pluginPath, filepath.Join(stagingDir, "release.json")} {
+	cosignPath := filepath.Join(stagingDir, "cosign")
+	trustedRootPath := filepath.Join(stagingDir, "sigstore-trusted-root.json")
+	for _, required := range []string{gatewayPath, cosignPath, trustedRootPath, pluginPath, filepath.Join(stagingDir, "release.json")} {
 		if info, err := os.Stat(required); err != nil || !info.Mode().IsRegular() {
 			return Pending{}, domain.NewError(409, "update_bundle_invalid", "Release archive is missing required files")
 		}
 	}
-	if err := os.Chmod(gatewayPath, 0o700); err != nil {
-		return Pending{}, err
+	for _, executable := range []string{gatewayPath, cosignPath} {
+		if err := os.Chmod(executable, 0o700); err != nil {
+			return Pending{}, err
+		}
 	}
 	gatewaySHA256, err := fileSHA256(gatewayPath)
+	if err != nil {
+		return Pending{}, err
+	}
+	cosignSHA256, err := fileSHA256(cosignPath)
+	if err != nil {
+		return Pending{}, err
+	}
+	trustedRootSHA256, err := fileSHA256(trustedRootPath)
 	if err != nil {
 		return Pending{}, err
 	}
@@ -280,7 +301,8 @@ func (m *Manager) Stage(ctx context.Context, requestedVersion, channel string) (
 	pending := Pending{
 		Version: release.TagName, StagingDir: stagingDir, ArchiveSHA256: actual,
 		SBOMSHA256: sbomSHA256, ProvenanceSHA256: provenanceSHA256,
-		GatewaySHA256: gatewaySHA256, PluginSHA256: pluginSHA256, ReleaseMetadataSHA256: releaseMetadataSHA256,
+		GatewaySHA256: gatewaySHA256, CosignSHA256: cosignSHA256, TrustedRootSHA256: trustedRootSHA256,
+		PluginSHA256: pluginSHA256, ReleaseMetadataSHA256: releaseMetadataSHA256,
 		CreatedAt:     time.Now().UTC(),
 		GatewayBinary: gatewayPath, PluginPackage: pluginPath,
 	}
@@ -457,7 +479,7 @@ func (m *Manager) download(ctx context.Context, rawURL, destination string, maxB
 
 func (m *Manager) verifySigstore(ctx context.Context, archivePath, bundlePath string) error {
 	command := exec.CommandContext(ctx, m.config.CosignBinary,
-		"verify-blob", "--bundle", bundlePath, "--offline",
+		"verify-blob", "--bundle", bundlePath, "--trusted-root", m.config.TrustedRoot,
 		"--certificate-identity-regexp", "^"+m.config.IdentityRegex+"$",
 		"--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", archivePath,
 	)

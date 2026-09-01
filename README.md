@@ -124,7 +124,7 @@ See [MusicMate integration](docs/MUSICMATE_INTEGRATION.md) and the versioned [Op
 - A plugin heartbeat older than 90 seconds blocks new sessions and room creation. Existing sessions receive a 60-second grace period.
 - WebSockets use one-time, 60-second tickets instead of long-lived bearer tokens in URLs.
 - Music-folder ACLs are checked at join and queue time. The room never borrows its owner's credentials.
-- Updates require a signed checksum manifest, SHA-256 match, and offline Sigstore verification of the archive, SPDX SBOM, and digest-bound in-toto/SLSA provenance before staging; the launcher rechecks extracted-file digests before activation.
+- Updates require a signed checksum manifest, SHA-256 match, and network-independent Sigstore verification of the archive, SPDX SBOM, and digest-bound in-toto/SLSA provenance before staging. Each release carries a pinned Cosign verifier/trusted root, and the launcher rechecks all extracted runtime-file digests before activation.
 - No telemetry is sent by default. A Navidrome administrator can explicitly export an automatically redacted JSON diagnostic bundle from MusicMate; it contains aggregate health only.
 
 Read [SECURITY.md](SECURITY.md) and [the threat model](docs/SECURITY_MODEL.md) before an internet-facing deployment.

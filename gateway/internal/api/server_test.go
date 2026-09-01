@@ -55,8 +55,9 @@ func newAPIFixture(t *testing.T) apiFixture {
 		ListenAddress: ":0", DataDir: dir, DatabasePath: filepath.Join(dir, "rooms.sqlite3"),
 		NavidromeInternal: internal, NavidromePublic: navidromePublic, GatewayPublic: gatewayPublic,
 		PluginPairingToken: pairing, Version: "test", ReleaseRepository: "mythezone/navidrome-music-room",
-		CosignBinary: "cosign", UpdateIdentity: "https://github.com/mythezone/navidrome-music-room/.github/workflows/release.yml@refs/tags/.*",
-		PluginLease: 90 * time.Second, ExistingGrace: time.Minute, SessionTTL: 15 * time.Minute,
+		CosignBinary: "cosign", SigstoreTrustedRoot: filepath.Join(dir, "trusted-root.json"),
+		UpdateIdentity: "https://github.com/mythezone/navidrome-music-room/.github/workflows/release.yml@refs/tags/.*",
+		PluginLease:    90 * time.Second, ExistingGrace: time.Minute, SessionTTL: 15 * time.Minute,
 		WebSocketTicketTTL: time.Minute, EmptyRoomPauseDelay: 15 * time.Second,
 	}
 	sessions := auth.NewSessionManager(storage, auth.NewNavidromeClient(internal), cfg.SessionTTL, cfg.PluginLease, cfg.ExistingGrace, navidromePublic.String(), gatewayPublic.String())

@@ -2,5 +2,7 @@
   "version": "0.1.0-dev",
   "apiVersion": "v1",
   "minimumNavidromeVersion": "0.63.2",
+  "cosignVersion": "3.1.2",
+  "sigstoreTrustedRootSHA256": "6494e21ea73fa7ee769f85f57d5a3e6a08725eae1e38c755fc3517c9e6bc0b66",
   "gatewayPlatforms": ["linux/amd64", "linux/arm64"]
 }

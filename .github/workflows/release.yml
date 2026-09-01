@@ -50,7 +50,27 @@ jobs:
         with:
           name: plugin
           path: dist
-      - run: ./script/package-release.sh "${{ matrix.arch }}" "${GITHUB_REF_NAME}"
+      - name: Package self-contained update runtime
+        env:
+          COSIGN_AMD64_IMAGE: ghcr.io/sigstore/cosign/cosign@sha256:bea051df6a6d3bc84288b6db098df38a81d87b7ed226f34d22aaae1bc329c2b7
+          COSIGN_ARM64_IMAGE: ghcr.io/sigstore/cosign/cosign@sha256:fb9fae1d016f9edc8f5c850f49416405a15944dc42d0f5ac3bbb8d9f76f889a5
+        run: |
+          case "${{ matrix.arch }}" in
+            amd64) cosign_image=$COSIGN_AMD64_IMAGE ;;
+            arm64) cosign_image=$COSIGN_ARM64_IMAGE ;;
+            *) exit 1 ;;
+          esac
+          cosign_dir=$(mktemp -d)
+          cosign_container=$(docker create --platform "linux/${{ matrix.arch }}" "$cosign_image")
+          cleanup() {
+            docker rm "$cosign_container" >/dev/null 2>&1 || true
+            rm -rf "$cosign_dir"
+          }
+          trap cleanup EXIT
+          docker cp "$cosign_container:/ko-app/cosign" "$cosign_dir/cosign"
+          COSIGN_BINARY="$cosign_dir/cosign" \
+            SIGSTORE_TRUSTED_ROOT="$PWD/deploy/sigstore/trusted_root.json" \
+            ./script/package-release.sh "${{ matrix.arch }}" "${GITHUB_REF_NAME}"
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-${{ matrix.arch }}

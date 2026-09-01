@@ -29,6 +29,7 @@ type Config struct {
 	Version             string
 	ReleaseRepository   string
 	CosignBinary        string
+	SigstoreTrustedRoot string
 	UpdateIdentity      string
 	LicensePublicKey    string
 	ManagedByLauncher   bool
@@ -93,6 +94,7 @@ func Load() (Config, error) {
 		Version:             envOr("MUSIC_ROOM_VERSION", "dev"),
 		ReleaseRepository:   repository,
 		CosignBinary:        envOr("MUSIC_ROOM_COSIGN_BINARY", "cosign"),
+		SigstoreTrustedRoot: envOr("MUSIC_ROOM_SIGSTORE_TRUSTED_ROOT", "/opt/music-room/release/sigstore-trusted-root.json"),
 		UpdateIdentity:      envOr("MUSIC_ROOM_UPDATE_IDENTITY", "https://github\\.com/"+regexp.QuoteMeta(repository)+"/\\.github/workflows/release\\.yml@refs/tags/.*"),
 		LicensePublicKey:    strings.TrimSpace(os.Getenv("MUSIC_ROOM_LICENSE_PUBLIC_KEY")),
 		ManagedByLauncher:   envBool("MUSIC_ROOM_MANAGED_BY_LAUNCHER", false),

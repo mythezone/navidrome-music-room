@@ -62,7 +62,15 @@ func TestManagerRejectsInvalidRepositoryAndUntrustedAssets(t *testing.T) {
 	if _, err := NewManager(Config{Repository: "../owner/repo"}, &memoryStateStore{}); err == nil {
 		t.Fatal("unsafe repository was accepted")
 	}
-	manager, err := NewManager(Config{Repository: "owner/repo", CurrentVersion: "v1"}, &memoryStateStore{})
+	if _, err := NewManager(Config{
+		Repository: "owner/repo", CosignBinary: "cosign", IdentityRegex: ".*",
+	}, &memoryStateStore{}); err == nil {
+		t.Fatal("missing pinned trusted root was accepted")
+	}
+	manager, err := NewManager(Config{
+		Repository: "owner/repo", CurrentVersion: "v1", CosignBinary: "cosign",
+		TrustedRoot: "/trusted-root.json", IdentityRegex: "https://example.test/release/.*",
+	}, &memoryStateStore{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +83,36 @@ func TestManagerRejectsInvalidRepositoryAndUntrustedAssets(t *testing.T) {
 	}
 	if trustedGitHubHost("github.com.evil.example") {
 		t.Fatal("lookalike GitHub host was trusted")
+	}
+}
+
+func TestSigstoreVerificationUsesPinnedRootWithoutDeprecatedOfflineMode(t *testing.T) {
+	dir := t.TempDir()
+	arguments := filepath.Join(dir, "arguments.txt")
+	fakeCosign := filepath.Join(dir, "cosign")
+	if err := os.WriteFile(fakeCosign, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$COSIGN_ARGUMENTS\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("COSIGN_ARGUMENTS", arguments)
+	trustedRoot := filepath.Join(dir, "trusted-root.json")
+	manager, err := NewManager(Config{
+		Repository: "owner/repo", CurrentVersion: "v1", CosignBinary: fakeCosign,
+		TrustedRoot: trustedRoot, IdentityRegex: "https://github\\.com/owner/repo/\\.github/workflows/release\\.yml@refs/tags/.*",
+	}, &memoryStateStore{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.verifySigstore(t.Context(), "/release/archive.tar.gz", "/release/archive.sigstore.json"); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := os.ReadFile(arguments)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := strings.Split(strings.TrimSpace(string(payload)), "\n")
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--trusted-root "+trustedRoot) || strings.Contains(joined, "--offline") {
+		t.Fatalf("unexpected cosign arguments: %q", args)
 	}
 }
 
@@ -224,7 +262,10 @@ func TestRollbackRequestRequiresVersionAndDatabasePair(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := &memoryStateStore{}
-	manager, err := NewManager(Config{Repository: "owner/repo", CurrentVersion: "v2.0.0", DataDir: root}, state)
+	manager, err := NewManager(Config{
+		Repository: "owner/repo", CurrentVersion: "v2.0.0", DataDir: root,
+		CosignBinary: "cosign", TrustedRoot: "/trusted-root.json", IdentityRegex: "https://example.test/release/.*",
+	}, state)
 	if err != nil {
 		t.Fatal(err)
 	}

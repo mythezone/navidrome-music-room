@@ -10,12 +10,16 @@ stage=$(mktemp -d)
 tar -xzf navidrome-music-room-linux-amd64.tar.gz -C "$stage"
 sudo install -m 0755 "$stage/music-room-launcher" /opt/navidrome-music-room/music-room-launcher
 sudo install -m 0755 "$stage/music-room-gateway" /opt/navidrome-music-room/release/music-room-gateway
+sudo install -m 0755 "$stage/cosign" /opt/navidrome-music-room/release/cosign
+sudo install -m 0644 "$stage/sigstore-trusted-root.json" /opt/navidrome-music-room/release/sigstore-trusted-root.json
 sudo install -m 0644 "$stage/navidrome-music-room.ndp" /opt/navidrome-music-room/release/navidrome-music-room.ndp
 sudo install -m 0644 "$stage/release.json" /opt/navidrome-music-room/release/release.json
 ```
 
 For arm64, use the `linux-arm64` bundle. Verify `checksums.txt` and the Sigstore
-bundles from the same GitHub Release before the initial install.
+bundles from the same GitHub Release before the initial install. The archive
+contains the architecture-matched Cosign verifier and pinned trusted root used
+by later one-click updates; it does not depend on a host-level Cosign install.
 
 Install and edit the service configuration:
 
@@ -34,6 +38,7 @@ same pairing token into the Navidrome plugin settings, authorize users, and
 enable the plugin. The service sandbox grants write access only to the shared
 Navidrome plugin directory.
 
-The automatic updater writes versioned releases below `room-data/releases/`;
+The automatic updater writes versioned gateway, Cosign, trusted-root, plugin,
+and metadata releases below `room-data/releases/`;
 the stable `/opt/navidrome-music-room/music-room-launcher` supervises atomic
 switches and rollback. Uninstalling the unit does not remove `room-data`.

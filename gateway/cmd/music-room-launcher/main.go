@@ -79,6 +79,8 @@ func run() int {
 		command.Stdin = os.Stdin
 		command.Env = withEnvironment(os.Environ(), "MUSIC_ROOM_MANAGED_BY_LAUNCHER", "true")
 		command.Env = withEnvironment(command.Env, "MUSIC_ROOM_VERSION", releaseVersion)
+		command.Env = withEnvironment(command.Env, "MUSIC_ROOM_COSIGN_BINARY", filepath.Join(current, "cosign"))
+		command.Env = withEnvironment(command.Env, "MUSIC_ROOM_SIGSTORE_TRUSTED_ROOT", filepath.Join(current, "sigstore-trusted-root.json"))
 		if err := command.Start(); err != nil {
 			logger.Error("start gateway failed", "release", current, "error", err)
 			if lastActivation != nil && rollbackActivation(cfg, *lastActivation, logger) == nil {
@@ -411,9 +413,9 @@ func copyRelease(source, destination string) error {
 	if err := os.MkdirAll(destination, 0o700); err != nil {
 		return err
 	}
-	for _, name := range []string{"music-room-gateway", "navidrome-music-room.ndp", "release.json"} {
+	for _, name := range []string{"music-room-gateway", "cosign", "sigstore-trusted-root.json", "navidrome-music-room.ndp", "release.json"} {
 		mode := os.FileMode(0o600)
-		if name == "music-room-gateway" {
+		if name == "music-room-gateway" || name == "cosign" {
 			mode = 0o700
 		}
 		if err := copyFile(filepath.Join(source, name), filepath.Join(destination, name), mode); err != nil {
@@ -619,9 +621,11 @@ func sha256File(path string) (string, error) {
 
 func verifyStagedRelease(staging string, pending updatemanager.Pending) error {
 	required := map[string]string{
-		"music-room-gateway":       pending.GatewaySHA256,
-		"navidrome-music-room.ndp": pending.PluginSHA256,
-		"release.json":             pending.ReleaseMetadataSHA256,
+		"music-room-gateway":         pending.GatewaySHA256,
+		"cosign":                     pending.CosignSHA256,
+		"sigstore-trusted-root.json": pending.TrustedRootSHA256,
+		"navidrome-music-room.ndp":   pending.PluginSHA256,
+		"release.json":               pending.ReleaseMetadataSHA256,
 	}
 	for name, expected := range required {
 		path := filepath.Join(staging, name)

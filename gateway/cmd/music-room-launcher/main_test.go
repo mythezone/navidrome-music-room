@@ -39,9 +39,11 @@ func TestCopyReleaseAndPluginInstallUseExpectedPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{
-		"music-room-gateway":       "gateway",
-		"navidrome-music-room.ndp": "plugin-v1",
-		"release.json":             `{"version":"v1"}`,
+		"music-room-gateway":         "gateway",
+		"cosign":                     "cosign",
+		"sigstore-trusted-root.json": `{"mediaType":"application/vnd.dev.sigstore.trustedroot+json;version=0.1"}`,
+		"navidrome-music-room.ndp":   "plugin-v1",
+		"release.json":               `{"version":"v1"}`,
 	} {
 		if err := os.WriteFile(filepath.Join(source, name), []byte(body), 0o777); err != nil {
 			t.Fatal(err)
@@ -51,6 +53,8 @@ func TestCopyReleaseAndPluginInstallUseExpectedPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertMode(t, filepath.Join(destination, "music-room-gateway"), 0o700)
+	assertMode(t, filepath.Join(destination, "cosign"), 0o700)
+	assertMode(t, filepath.Join(destination, "sigstore-trusted-root.json"), 0o600)
 	assertMode(t, filepath.Join(destination, "navidrome-music-room.ndp"), 0o600)
 
 	cfg := launcherConfig{dataDir: root, pluginDir: filepath.Join(root, "plugins")}
@@ -84,8 +88,11 @@ func TestVerifyStagedReleaseRejectsChangesAfterSignatureVerification(t *testing.
 	gatewayDigest := mustSHA256(t, filepath.Join(staging, "music-room-gateway"))
 	pluginDigest := mustSHA256(t, filepath.Join(staging, "navidrome-music-room.ndp"))
 	metadataDigest := mustSHA256(t, filepath.Join(staging, "release.json"))
+	cosignDigest := mustSHA256(t, filepath.Join(staging, "cosign"))
+	trustedRootDigest := mustSHA256(t, filepath.Join(staging, "sigstore-trusted-root.json"))
 	pending := updatemanager.Pending{
-		GatewaySHA256: gatewayDigest, PluginSHA256: pluginDigest, ReleaseMetadataSHA256: metadataDigest,
+		GatewaySHA256: gatewayDigest, CosignSHA256: cosignDigest, TrustedRootSHA256: trustedRootDigest,
+		PluginSHA256: pluginDigest, ReleaseMetadataSHA256: metadataDigest,
 	}
 	if err := verifyStagedRelease(staging, pending); err != nil {
 		t.Fatalf("verified staging directory was rejected: %v", err)
@@ -196,9 +203,11 @@ func createTestRelease(t *testing.T, path, version, plugin string) {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{
-		"music-room-gateway":       "gateway-" + version,
-		"navidrome-music-room.ndp": plugin,
-		"release.json":             `{"version":"` + version + `"}`,
+		"music-room-gateway":         "gateway-" + version,
+		"cosign":                     "cosign-" + version,
+		"sigstore-trusted-root.json": `{"mediaType":"application/vnd.dev.sigstore.trustedroot+json;version=0.1"}`,
+		"navidrome-music-room.ndp":   plugin,
+		"release.json":               `{"version":"` + version + `"}`,
 	} {
 		if err := os.WriteFile(filepath.Join(path, name), []byte(body), 0o700); err != nil {
 			t.Fatal(err)

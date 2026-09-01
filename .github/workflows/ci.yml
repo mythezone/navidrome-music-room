@@ -78,6 +78,8 @@ jobs:
       - name: Validate JSON fixtures and YAML syntax
         run: |
           find contracts/fixtures -name '*.json' -print0 | xargs -0 -n1 jq empty
+          jq empty release.json deploy/sigstore/trusted_root.json
+          echo '6494e21ea73fa7ee769f85f57d5a3e6a08725eae1e38c755fc3517c9e6bc0b66  deploy/sigstore/trusted_root.json' | sha256sum -c -
           ruby -e "require 'yaml'; YAML.load_file('contracts/openapi.yaml', aliases: true)"
       - name: Lint OpenAPI
         run: npx --yes @redocly/cli@1.34.5 lint contracts/openapi.yaml --extends=minimal
@@ -120,6 +122,8 @@ jobs:
           for _ in $(seq 1 30); do
             if docker exec "$container" /opt/music-room/release/music-room-gateway --healthcheck; then
               docker exec "$container" test -f /data/rooms.sqlite3
+              docker exec "$container" /data/releases/current/cosign version
+              docker exec "$container" test -r /data/releases/current/sigstore-trusted-root.json
               exit 0
             fi
             sleep 1

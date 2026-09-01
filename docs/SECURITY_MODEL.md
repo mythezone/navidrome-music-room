@@ -21,7 +21,7 @@
 | Room grants broader music access | Join and queue folder checks; every client streams with its own account |
 | Audio proxy becomes data exfiltration path | Gateway implements no media endpoint |
 | Stale or disabled plugin leaves service open | 90-second lease for new work, 60-second existing-session grace |
-| Malicious update | Fixed GitHub repository, HTTPS host allowlist, SHA-256, offline Sigstore verification, safe extraction, health rollback |
+| Malicious update | Fixed GitHub repository, HTTPS host allowlist, SHA-256, pinned TUF-authenticated Sigstore root, network-independent signature verification, safe extraction, health rollback |
 | Archive traversal or device file | Clean relative paths; regular files/directories only; extraction size limit |
 | Database migration failure | Consistent pre-migration and pre-switch backups; launcher restore |
 | Secrets in diagnostics | Structured logs omit URL query and authorization; the admin-only opt-in export contains aggregate health and excludes URLs, names, identifiers, invitation data, credentials, and database rows |

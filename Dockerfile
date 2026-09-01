@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.12
 ARG GO_IMAGE=golang:1.25-bookworm
-ARG COSIGN_IMAGE=ghcr.io/sigstore/cosign/cosign:v3.1.2
+ARG COSIGN_IMAGE=ghcr.io/sigstore/cosign/cosign@sha256:d91bc4e7e95e8d2f549c747a72dc174f90579e410a1695f57f686674f84ce849
 
 FROM ${GO_IMAGE} AS gateway-build
 ARG TARGETOS=linux
@@ -56,19 +56,24 @@ FROM ${COSIGN_IMAGE} AS cosign
 FROM scratch AS artifacts
 COPY --from=gateway-build /out/music-room-gateway /music-room-gateway
 COPY --from=gateway-build /out/music-room-launcher /music-room-launcher
+COPY --from=cosign /ko-app/cosign /cosign
+COPY deploy/sigstore/trusted_root.json /sigstore-trusted-root.json
 COPY --from=ndp-build /out/navidrome-music-room.ndp /navidrome-music-room.ndp
 COPY --from=ndp-build /out/release.json /release.json
 
 FROM debian:bookworm-slim
 ARG VERSION=0.1.0-dev
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
-COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 COPY --from=gateway-build /out/music-room-launcher /usr/local/bin/music-room-launcher
 COPY --from=gateway-build /out/music-room-gateway /opt/music-room/release/music-room-gateway
+COPY --from=cosign /ko-app/cosign /opt/music-room/release/cosign
+COPY deploy/sigstore/trusted_root.json /opt/music-room/release/sigstore-trusted-root.json
 COPY --from=ndp-build /out/navidrome-music-room.ndp /opt/music-room/release/navidrome-music-room.ndp
 COPY --from=ndp-build /out/release.json /opt/music-room/release/release.json
-RUN chmod 0755 /usr/local/bin/music-room-launcher /opt/music-room/release/music-room-gateway && \
-    chmod 0644 /opt/music-room/release/navidrome-music-room.ndp /opt/music-room/release/release.json
+RUN chmod 0755 /usr/local/bin/music-room-launcher /opt/music-room/release/music-room-gateway /opt/music-room/release/cosign && \
+    chmod 0644 /opt/music-room/release/sigstore-trusted-root.json /opt/music-room/release/navidrome-music-room.ndp /opt/music-room/release/release.json
+ENV MUSIC_ROOM_COSIGN_BINARY=/opt/music-room/release/cosign
+ENV MUSIC_ROOM_SIGSTORE_TRUSTED_ROOT=/opt/music-room/release/sigstore-trusted-root.json
 USER 65532:65532
 EXPOSE 4534
 HEALTHCHECK --interval=15s --timeout=3s --start-period=15s --retries=4 CMD ["/opt/music-room/release/music-room-gateway", "--healthcheck"]

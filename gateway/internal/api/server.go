@@ -44,7 +44,7 @@ type Server struct {
 func NewServer(cfg config.Config, storage *store.Store, sessions *auth.SessionManager, logger *slog.Logger) (*Server, error) {
 	updater, err := updatemanager.NewManager(updatemanager.Config{
 		Repository: cfg.ReleaseRepository, CurrentVersion: cfg.Version, DataDir: cfg.DataDir,
-		CosignBinary: cfg.CosignBinary, IdentityRegex: cfg.UpdateIdentity,
+		CosignBinary: cfg.CosignBinary, TrustedRoot: cfg.SigstoreTrustedRoot, IdentityRegex: cfg.UpdateIdentity,
 	}, storage)
 	if err != nil {
 		return nil, err
