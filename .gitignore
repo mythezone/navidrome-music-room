@@ -1,6 +1,8 @@
 .env
 dist/
 room-data/
+data/
+music/
 *.ndp
 *.wasm
 *.sqlite3

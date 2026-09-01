@@ -2,7 +2,7 @@
 set -eu
 
 navidrome_tag=${1:-0.63.2}
-root_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root_dir=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 gateway_image=${MUSIC_ROOM_E2E_IMAGE:-}
 gateway_binary=${MUSIC_ROOM_E2E_GATEWAY_BINARY:-$root_dir/dist/music-room-gateway-e2e}
 pairing_token=0123456789abcdef0123456789abcdef

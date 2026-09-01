@@ -17,6 +17,20 @@ func TestStaleGeneration(t *testing.T) {
 	}
 }
 
+func TestEffectiveVersionSupportsTinyGoInjectionAndDevelopmentFallback(t *testing.T) {
+	previous := version
+	t.Cleanup(func() { version = previous })
+
+	version = ""
+	if got := effectiveVersion(); got != "dev" {
+		t.Fatalf("expected development fallback, got %q", got)
+	}
+	version = " v1.2.3 "
+	if got := effectiveVersion(); got != "v1.2.3" {
+		t.Fatalf("expected injected version, got %q", got)
+	}
+}
+
 func TestStaleGenerationRejectsUnrelatedResponses(t *testing.T) {
 	tests := []*host.HTTPResponse{
 		nil,

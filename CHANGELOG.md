@@ -4,6 +4,18 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [0.1.0-beta.3] - 2026-09-01
+
+### Fixed
+
+- Ensure TinyGo release builds embed the requested plugin version so gateway heartbeats and one-click update confirmation no longer report `dev`.
+- Fail plugin builds when version injection is missing.
+- Enable Navidrome's plugin file watcher so a gateway-installed or updated `.ndp` is discovered without restarting Navidrome.
+
+### Changed
+
+- Let Compose track the official Navidrome `latest` image by default while keeping the image, data directory, and plugin directory configurable for pinned or isolated deployments.
+
 ## [0.1.0-beta.2] - 2026-09-01
 
 ### Fixed
@@ -25,6 +37,7 @@ beta.2; automatic updates are self-contained from beta.2 onward.
 - Signed GitHub Release staging, stable launcher activation, health rollback, Compose/systemd deployment, and OpenAPI/golden contracts.
 - MusicMate Navidrome link/provider compatibility types.
 
-[Unreleased]: https://github.com/mythezone/navidrome-music-room/compare/v0.1.0-beta.2...HEAD
+[Unreleased]: https://github.com/mythezone/navidrome-music-room/compare/v0.1.0-beta.3...HEAD
+[0.1.0-beta.3]: https://github.com/mythezone/navidrome-music-room/compare/v0.1.0-beta.2...v0.1.0-beta.3
 [0.1.0-beta.2]: https://github.com/mythezone/navidrome-music-room/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/mythezone/navidrome-music-room/releases/tag/v0.1.0-beta.1

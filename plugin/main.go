@@ -19,7 +19,10 @@ const (
 	generationKey       = "sync-generation"
 )
 
-var version = "dev"
+// TinyGo only applies -ldflags=-X reliably to an uninitialized string global.
+// Keep the development fallback in effectiveVersion instead of initializing
+// this variable, otherwise release builds silently report "dev" in heartbeats.
+var version string
 
 type bridgePlugin struct{}
 
@@ -121,7 +124,7 @@ func syncGateway() error {
 	generation := nextGeneration()
 	for attempt := 0; attempt < 2; attempt++ {
 		payload, err := json.Marshal(syncPayload{
-			PluginVersion: version, Generation: generation,
+			PluginVersion: effectiveVersion(), Generation: generation,
 			NavidromeInternalURL: strings.TrimRight(navidromeInternalURL, "/"),
 			NavidromePublicURL:   strings.TrimRight(navidromePublicURL, "/"),
 			GatewayPublicURL:     strings.TrimRight(gatewayPublicURL, "/"),
@@ -162,6 +165,14 @@ func syncGateway() error {
 		return fmt.Errorf("gateway rejected sync with HTTP %d", status)
 	}
 	return fmt.Errorf("gateway rejected generation recovery")
+}
+
+func effectiveVersion() string {
+	value := strings.TrimSpace(version)
+	if value == "" {
+		return "dev"
+	}
+	return value
 }
 
 func staleGeneration(response *host.HTTPResponse) (int64, bool) {

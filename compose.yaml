@@ -2,7 +2,7 @@ name: navidrome-music-room
 
 services:
   navidrome:
-    image: deluan/navidrome:0.63.2
+    image: ${NAVIDROME_IMAGE:-deluan/navidrome:latest}
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
     ports:
@@ -12,11 +12,11 @@ services:
       ND_BASEURL: ""
       ND_PLUGINS_ENABLED: "true"
       ND_PLUGINS_FOLDER: /plugins
-      ND_PLUGINS_AUTORELOAD: "false"
+      ND_PLUGINS_AUTORELOAD: "true"
       TZ: ${TZ:-UTC}
     volumes:
-      - ./data/navidrome:/data
-      - ./data/plugins:/plugins
+      - ${NAVIDROME_DATA_PATH:-./data/navidrome}:/data
+      - ${NAVIDROME_PLUGINS_PATH:-./data/plugins}:/plugins
       - ${MUSIC_LIBRARY_PATH:-./music}:/music:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4533/ping"]
@@ -49,7 +49,7 @@ services:
       MUSIC_ROOM_LICENSE_PUBLIC_KEY: ${MUSIC_ROOM_LICENSE_PUBLIC_KEY:-}
       TZ: ${TZ:-UTC}
     volumes:
-      - ./data/plugins:/plugins
+      - ${NAVIDROME_PLUGINS_PATH:-./data/plugins}:/plugins
     healthcheck:
       test: ["CMD", "/opt/music-room/release/music-room-gateway", "--healthcheck"]
       interval: 15s

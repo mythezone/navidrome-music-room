@@ -6,6 +6,7 @@ DIST ?= ../dist
 build:
 	mkdir -p $(DIST)/plugin
 	GOFLAGS="$(GOFLAGS) -buildvcs=false" tinygo build -target wasip1 -buildmode=c-shared -ldflags="-X main.version=$(VERSION)" -o $(DIST)/plugin/plugin.wasm .
+	@LC_ALL=C grep -aFq -- "$(VERSION)" $(DIST)/plugin/plugin.wasm || (echo "TinyGo did not inject plugin version $(VERSION)" >&2; exit 1)
 
 package: build
 	cp manifest.json $(DIST)/plugin/manifest.json

@@ -20,7 +20,6 @@ FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS plugin-build
 ARG VERSION=0.1.0-dev
 ARG BUILDARCH
 ARG TINYGO_VERSION=0.41.1
-ARG GOPROXY=https://proxy.golang.org,direct
 RUN case "${BUILDARCH}" in \
       amd64) tinygo_sha=e156d1d93a376eef639a4143d13be07e8c463fb6cf2d7d447698ed4474d23e91 ;; \
       arm64) tinygo_sha=789733bc3b5bace0bd1835a267b3ea267804a7ef1cfe69bc522c295f5226d624 ;; \
@@ -34,11 +33,13 @@ RUN case "${BUILDARCH}" in \
 ENV TINYGOROOT=/opt/tinygo
 ENV PATH=/opt/tinygo/bin:$PATH
 WORKDIR /src/plugin
+ARG GOPROXY=https://proxy.golang.org,direct
 COPY plugin/go.mod plugin/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod GOPROXY=${GOPROXY} go mod download
 COPY plugin/ ./
 RUN --mount=type=cache,target=/go/pkg/mod \
-    GOFLAGS=-buildvcs=false tinygo build -target wasip1 -buildmode=c-shared -ldflags="-X main.version=${VERSION}" -o /out/plugin.wasm .
+    GOFLAGS=-buildvcs=false tinygo build -target wasip1 -buildmode=c-shared -ldflags="-X main.version=${VERSION}" -o /out/plugin.wasm . && \
+    LC_ALL=C grep -aFq -- "${VERSION}" /out/plugin.wasm
 
 FROM debian:bookworm-slim AS ndp-build
 ARG VERSION=0.1.0-dev
