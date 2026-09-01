@@ -10,7 +10,7 @@ username=nmr-admin
 password=nmr-e2e-password
 salt=0123456789abcdef
 
-for command_name in docker curl jq ffmpeg md5sum; do
+for command_name in docker curl jq md5sum; do
   command -v "$command_name" >/dev/null 2>&1 || {
     echo "$command_name is required" >&2
     exit 1
@@ -38,15 +38,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 mkdir -p "$work_dir/music"
-ffmpeg -hide_banner -loglevel error \
-  -f lavfi -i sine=frequency=440:duration=3 \
-  -f lavfi -i color=c=0x6d28d9:s=96x96 \
-  -map 0:a -map 1:v -c:a libmp3lame -b:a 192k -c:v png \
-  -frames:v 1 -disposition:v:0 attached_pic \
-  -metadata title='NMR E2E Tone' \
-  -metadata artist='MusicMate Test' \
-  -metadata album='Navidrome Integration' \
-  -y "$work_dir/music/nmr-e2e-tone.mp3"
+cp "$root_dir/script/testdata/nmr-e2e-tone.mp3" "$work_dir/music/nmr-e2e-tone.mp3"
 cp "$root_dir/script/testdata/nmr-e2e-tone.lrc" "$work_dir/music/nmr-e2e-tone.lrc"
 chmod -R a+rX "$work_dir/music"
 
