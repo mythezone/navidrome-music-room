@@ -104,7 +104,7 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: v3.1.2
-      - uses: anchore/sbom-action/download-syft@v0.20.6
+      - uses: anchore/sbom-action/download-syft@v0.24.2
       - name: Package ready-to-run Docker Compose kit
         run: ./script/package-compose-release.sh "$GITHUB_REF_NAME" release/navidrome-music-room.ndp release
       - name: Checksums, SBOMs, and keyless Sigstore bundles
