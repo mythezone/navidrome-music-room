@@ -210,10 +210,10 @@ test "$room_code" = 201
 room_id=$(jq -r '.roomID // empty' "$room_file")
 test -n "$room_id"
 
-locked_code=$(curl -sS --max-time 10 --output /dev/null --write-out '%{http_code}' \
+planned_feature_code=$(curl -sS --max-time 10 --output /dev/null --write-out '%{http_code}' \
   --header "Authorization: Bearer $session_token" \
   "$gateway_base/api/v1/rooms/$room_id/chat")
-test "$locked_code" = 402
+test "$planned_feature_code" = 501
 
 diagnostics_json=$(curl -fsS --max-time 10 \
   --header "Authorization: Bearer $session_token" \
@@ -228,5 +228,5 @@ gateway_media_code=$(curl -sS --max-time 10 --output /dev/null --write-out '%{ht
 test "$gateway_media_code" = 404
 
 navidrome_version=$(printf '%s' "$search_json" | jq -r '."subsonic-response".serverVersion // ."subsonic-response".version // "unknown"')
-printf 'Navidrome %s (%s): auth, folders, search, album, cover, lyrics, Range, transcode, room ACL, lock, and redacted diagnostics passed\n' \
+printf 'Navidrome %s (%s): auth, folders, search, album, cover, lyrics, Range, transcode, room ACL, planned-feature response, and redacted diagnostics passed\n' \
   "$navidrome_tag" "$navidrome_version"
