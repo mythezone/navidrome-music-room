@@ -10,6 +10,10 @@ const adminUsername = process.env.NMR_ADMIN_USERNAME || 'admin'
 const adminPassword = required('NMR_ADMIN_PASSWORD')
 const chromiumPath = process.env.NMR_CHROMIUM_PATH || '/usr/bin/chromium-browser'
 const aclLibraryPath = process.env.NMR_ACL_LIBRARY_PATH || '/plugins/navidrome-music-room/room-data/acl-test'
+const documentationQuery = process.env.NMR_SCREENSHOT_QUERY?.trim() || ''
+const documentationTrack = process.env.NMR_SCREENSHOT_TRACK?.trim() || ''
+const documentationRoomName = process.env.NMR_SCREENSHOT_ROOM_NAME?.trim() || ''
+const forbiddenDocumentationText = /黄明志|Namewee/i
 const suffix = `${Date.now().toString(36)}${randomBytes(3).toString('hex')}`
 const member = { username: `nmr_web_${suffix}`, password: randomBytes(18).toString('base64url') }
 const isolated = { username: `nmr_acl_${suffix}`, password: randomBytes(18).toString('base64url') }
@@ -123,47 +127,30 @@ async function audioState(page) {
   })
 }
 
-async function anonymizeDocumentationCapture(page) {
-  const artwork = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#252b3a"/><stop offset="1" stop-color="#11131a"/></linearGradient><radialGradient id="r"><stop stop-color="#63dfd1" stop-opacity=".52"/><stop offset="1" stop-color="#ff647a" stop-opacity=".04"/></radialGradient></defs><rect width="800" height="800" rx="44" fill="url(#g)"/><circle cx="400" cy="400" r="285" fill="url(#r)" stroke="#63dfd1" stroke-opacity=".3" stroke-width="3"/><circle cx="400" cy="400" r="112" fill="#0d0e13" stroke="#ff647a" stroke-width="18"/><circle cx="400" cy="400" r="20" fill="#f6f7fb"/><path d="M530 230v290c0 54-45 98-101 98-45 0-81-29-81-66s36-66 81-66c17 0 33 4 46 12V279l-203 43v250c0 54-45 98-101 98-45 0-81-29-81-66s36-66 81-66c17 0 33 4 46 12V274z" fill="#f6f7fb" fill-opacity=".88"/></svg>')}`
-  await page.locator('.hero-artwork:visible').evaluate((image, source) => {
-    image.src = source
-    image.alt = 'Music Room sample artwork'
-  }, artwork)
-  await page.locator('.room-identity h1').evaluate((node) => { node.textContent = 'Navidrome 一起听歌' })
-  await page.locator('[data-testid="current-track"]:visible h2').evaluate((node) => { node.textContent = 'Example Track' })
-  await page.locator('[data-testid="current-track"]:visible p').evaluate((node) => { node.textContent = 'Example Artist · Example Album' })
+async function prepareDocumentationCatalog(page) {
+  if (!documentationQuery) return
+  const input = page.getByRole('textbox', { name: '搜索曲库' })
+  await input.fill(documentationQuery)
+  await page.getByRole('button', { name: '搜索', exact: true }).click()
+  await page.getByRole('heading', { name: `“${documentationQuery}”的搜索结果` }).waitFor({ state: 'visible', timeout: 20_000 })
+  const text = await page.locator('.catalog-panel').innerText()
+  assert.match(text, new RegExp(documentationQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `documentation catalog does not show ${documentationQuery}`)
+  assert.doesNotMatch(text, forbiddenDocumentationText, 'documentation catalog contains excluded artist data')
 }
 
-async function anonymizeCatalogCapture(page) {
-  await page.locator('.cover-card').evaluateAll((cards) => {
-    cards.slice(0, 24).forEach((card, index) => {
-      const title = card.querySelector('strong')
-      const artist = card.querySelector('.cover-card-open > span:last-child')
-      const image = card.querySelector('img')
-      if (title) title.textContent = `Example Album ${index + 1}`
-      if (artist) artist.textContent = 'Example Artist'
-      if (image) image.style.filter = 'saturate(.25) brightness(.7)'
-    })
-  })
-  await page.locator('.artist-card strong').evaluateAll((artists) => {
-    artists.forEach((artist, index) => { artist.textContent = `Example Artist ${index + 1}` })
-  })
+async function assertDocumentationCapture(page) {
+  if (!documentationQuery) return
+  const text = await page.locator('body').innerText()
+  assert.match(text, new RegExp(documentationQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `documentation capture does not show ${documentationQuery}`)
+  assert.doesNotMatch(text, forbiddenDocumentationText, 'documentation capture contains excluded artist data')
 }
 
-async function anonymizeQueueCapture(page) {
-  await page.locator('.track-row').evaluateAll((rows) => {
-    rows.forEach((row, index) => {
-      const title = row.querySelector('strong')
-      const detail = row.querySelector('.track-main > span')
-      const image = row.querySelector('img')
-      if (title) title.textContent = `Example Track ${index + 1}`
-      if (detail) detail.textContent = 'Example Artist · Example Album'
-      if (image) image.style.filter = 'saturate(.25) brightness(.7)'
-    })
-  })
-  await page.locator('.notice-toast').evaluateAll((notices) => {
-    notices.forEach((notice) => { notice.textContent = '✓ 已点播整张专辑（13 首）' })
-  })
+async function waitForDocumentationImages(page, selector) {
+  if (!documentationQuery) return
+  await page.waitForFunction((imageSelector) => {
+    const images = [...document.querySelectorAll(imageSelector)]
+    return images.length > 0 && images.every((image) => image.complete && image.naturalWidth > 0)
+  }, selector, { timeout: 30_000 })
 }
 
 let adminToken = ''
@@ -207,9 +194,12 @@ try {
   const adminAuth = proof({ username: adminUsername, password: adminPassword })
   const folders = (await subsonic('getMusicFolders', adminAuth)).musicFolders?.musicFolder || []
   assert.ok(folders.some((folder) => Number(folder.id) === libraryID), 'admin proof cannot see the primary library')
-  const search = await subsonic('search3', adminAuth, { query: '*', artistCount: 0, albumCount: 0, songCount: 200, musicFolderId: libraryID })
+  const search = await subsonic('search3', adminAuth, { query: documentationQuery || '*', artistCount: 20, albumCount: 40, songCount: 200, musicFolderId: libraryID })
   const songs = search.searchResult3?.song || []
-  const song = songs.find((item) => item.contentType === 'audio/mpeg' && Number(item.duration) > 20) || songs.find((item) => Number(item.duration) > 20)
+  const playableSongs = songs.filter((item) => Number(item.duration) > 20)
+  const song = playableSongs.find((item) => documentationTrack && item.title === documentationTrack)
+    || playableSongs.find((item) => item.contentType === 'audio/mpeg')
+    || playableSongs[0]
   assert.ok(song?.id, 'the primary library has no browser-playable test song')
 
   const adminSession = await exchange({ username: adminUsername, password: adminPassword })
@@ -220,7 +210,7 @@ try {
 
   room = await roomAPI('/rooms', {
     method: 'POST', token: adminSession.sessionToken, expected: [201],
-    body: { name: `Web 1.0 双客户端 ${suffix}`, musicFolderIDs: [libraryID], queueLimit: 20, playbackMode: 'fifo', preloadNextTrack: true },
+    body: { name: documentationRoomName || `Web 1.0 双客户端 ${suffix}`, musicFolderIDs: [libraryID], queueLimit: 20, playbackMode: 'fifo', preloadNextTrack: true },
   })
   await roomAPI(`/rooms/${room.roomID}/queue/tracks`, {
     method: 'POST', token: adminSession.sessionToken, expected: [201], body: { track: { id: song.id, musicFolderID: libraryID } },
@@ -295,12 +285,14 @@ try {
   const songRows = await adminPage.locator('[data-testid="catalog-song-list"] .track-row').count()
   assert.ok(songRows > 0, 'the Songs catalog is empty')
 
+  await prepareDocumentationCatalog(adminPage)
+
   await adminPage.locator('[data-testid="catalog-albums"]').click()
   await adminPage.locator('[data-testid="catalog-album-grid"] .cover-card').first().waitFor({ state: 'visible' })
   const albumCards = await adminPage.locator('[data-testid="catalog-album-grid"] .cover-card').count()
   assert.ok(albumCards > 0, 'the Albums catalog is empty')
-  await anonymizeDocumentationCapture(adminPage)
-  await anonymizeCatalogCapture(adminPage)
+  await assertDocumentationCapture(adminPage)
+  await waitForDocumentationImages(adminPage, '.catalog-panel img')
   await adminPage.screenshot({ path: artifacts.catalog })
 
   await adminPage.locator('[data-testid="catalog-album-grid"] .cover-card-open').first().click()
@@ -322,8 +314,8 @@ try {
   await adminPage.locator('[data-testid="catalog-album-grid"] .cover-card').first().waitFor({ state: 'visible' })
 
   await adminPage.locator('.desktop-tabs button').filter({ hasText: '待播放' }).click()
-  await anonymizeDocumentationCapture(adminPage)
-  await anonymizeQueueCapture(adminPage)
+  await assertDocumentationCapture(adminPage)
+  await waitForDocumentationImages(adminPage, '.room-shell img')
   await adminPage.screenshot({ path: artifacts.desktop })
   const beforeReloadRevision = await memberPage.locator('.room-shell').getAttribute('data-revision')
   await memberPage.reload({ waitUntil: 'domcontentloaded' })
@@ -344,12 +336,13 @@ try {
   await mobilePage.locator('.mobile-tabs').waitFor({ state: 'visible' })
   await mobilePage.locator('.mobile-tabs button').filter({ hasText: '点歌台' }).click()
   await mobilePage.locator('[data-testid="catalog-song-list"]').waitFor({ state: 'visible', timeout: 20_000 })
+  await prepareDocumentationCatalog(mobilePage)
   await mobilePage.locator('[data-testid="catalog-albums"]').click()
   await mobilePage.locator('[data-testid="catalog-album-grid"] .cover-card').first().waitFor({ state: 'visible' })
   const mobileMetrics = await mobilePage.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }))
   assert.ok(mobileMetrics.scrollWidth <= mobileMetrics.width + 1, `mobile layout overflows horizontally: ${JSON.stringify(mobileMetrics)}`)
-  await mobilePage.locator('.room-identity h1').evaluate((node) => { node.textContent = 'Navidrome 一起听歌' })
-  await anonymizeCatalogCapture(mobilePage)
+  await assertDocumentationCapture(mobilePage)
+  await waitForDocumentationImages(mobilePage, '.catalog-panel img')
   await mobilePage.screenshot({ path: artifacts.mobile })
 
   const aclContext = await browser.newContext({ viewport: { width: 390, height: 844 } })
@@ -365,7 +358,8 @@ try {
   process.stdout.write(`${JSON.stringify({
     passed: true,
     roomID: room.roomID,
-    song: { id: song.id, title: song.title, contentType: song.contentType },
+    song: { id: song.id, title: song.title, artist: song.artist, album: song.album, contentType: song.contentType },
+    documentation: documentationQuery ? { query: documentationQuery, roomName: documentationRoomName || room.name, excludedArtistsVerified: true } : null,
     browsers: { independentClients: 2, refreshReconnect: true, mobileViewport: mobileMetrics, aclIsolation: true, catalog: { songRows, albumCards, artistCards, wholeAlbumQueued: queueAfterAlbum - queueBeforeAlbum } },
     audio: { directStreamResponses: directMediaResponses.length, range, driftSeconds: Math.abs(adminAudio.currentTime - memberAudio.currentTime), gatewayMediaResponses: 0 },
     screenshots: artifacts,

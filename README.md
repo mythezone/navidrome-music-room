@@ -1,10 +1,11 @@
 <p align="center">
-  <img src="docs/assets/logo.png" width="148" alt="Navidrome Music Room logo" />
+  <img src="docs/assets/musicmate-app-icon-source.png" width="148" alt="Navidrome Music Room logo" />
 </p>
 
 <h1 align="center">Navidrome Music Room</h1>
 
-<p align="center"><strong>Turn your Navidrome library into a private, synchronized listening room.</strong></p>
+<p align="center"><strong>Turn your Navidrome library into a private, synchronized listening room.</strong><br />
+<sub>Create in Navidrome · share one link or QR code · listen together on desktop and mobile</sub></p>
 
 <p align="center">
   <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev"><img alt="Version" src="https://img.shields.io/badge/version-v1.1.0--dev-ff6b57"></a>
@@ -19,20 +20,30 @@
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen"></a>
 </p>
 
-<p align="center"><a href="README.zh-CN.md">简体中文</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">Download</a> · <a href="#quick-install">Install</a> · <a href="#use-the-room">Use</a></p>
+<p align="center"><strong><a href="README.zh-CN.md">简体中文</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">Download v1.1.0-dev</a> · <a href="#quick-install">Quick install</a> · <a href="#use-the-room">User guide</a></strong></p>
 
-![Navidrome Music Room across desktop and mobile](docs/assets/hero.png)
+<p align="center"><img src="docs/assets/hero.png" width="100%" alt="Navidrome Music Room across a self-hosted server, desktop and mobile" /></p>
 
-An administrator creates a room from Navidrome's plugin page, shares a link or QR code, and invited Navidrome users listen together in a desktop or mobile browser. Everyone uses their own Navidrome account and library permissions. Music is streamed directly from Navidrome while the room keeps play, pause, seek, next track, queue and reconnect state synchronized.
+<table>
+  <tr>
+    <td width="33%" align="center"><strong>① Create</strong><br /><sub>An administrator opens the plugin Website and creates a room.</sub></td>
+    <td width="33%" align="center"><strong>② Share</strong><br /><sub>Copy the private invitation or let friends scan its local QR code.</sub></td>
+    <td width="33%" align="center"><strong>③ Listen</strong><br /><sub>Every invited Navidrome user joins the same synchronized queue.</sub></td>
+  </tr>
+</table>
 
-Current prerelease: **v1.1.0-dev**. It adds first-class **Songs / Albums / Artists** browsing and whole-album requests to the Web room.
+Everyone signs in with their own Navidrome account and keeps their own library permissions. Music streams directly from Navidrome; the room synchronizes play, pause, seek, next track, requests and reconnect state. Current prerelease **v1.1.0-dev** adds complete **Songs / Albums / Artists** browsing and whole-album requests in the Web room.
 
 ## Where it is useful
 
-- Listen to an album with friends in different places while everyone stays on the same second.
-- Let family members use one self-hosted library without sharing an administrator password.
-- Run a private party or team room where members can request tracks and the owner controls playback.
-- Share a room from Navidrome now, then open the same invitation in the upcoming MusicMate app.
+<table>
+  <tr>
+    <td width="25%"><strong>🌍 Friends apart</strong><br /><sub>Share an album while everyone stays on the same second.</sub></td>
+    <td width="25%"><strong>🏠 Family library</strong><br /><sub>Keep separate accounts and permissions without sharing an admin password.</sub></td>
+    <td width="25%"><strong>🎉 Private events</strong><br /><sub>Let members request tracks while the room owner controls playback.</sub></td>
+    <td width="25%"><strong>📱 Web + App</strong><br /><sub>Open in any browser today and in the upcoming MusicMate app.</sub></td>
+  </tr>
+</table>
 
 ## What works
 
@@ -49,23 +60,36 @@ Current prerelease: **v1.1.0-dev**. It adds first-class **Songs / Albums / Artis
 | Direct Navidrome streaming with each user's own access | ✅ |
 | Chat, richer room activity and community statistics | Open-source roadmap |
 
-The management console is opened from the stock Navidrome plugin **Website** link:
+## Real product tour
 
-![Room management opened from Navidrome](docs/assets/admin-ui-live.png)
+These captures come from the running v1.1.0-dev build and a real Navidrome library. The catalog shown here is filtered to Jay Chou; no mock albums or substituted cover art are used.
 
-It creates invitation links and QR codes locally in the browser:
+<p align="center">
+  <img src="docs/assets/web-room-catalog-live.png" width="100%" alt="Real Jay Chou album results in the Navidrome Music Room request desk" /><br />
+  <sub>Search Navidrome by song, album or artist, then request one track or the whole album.</sub>
+</p>
 
-![Share link and QR dialog](docs/assets/share-dialog-live.png)
+<table>
+  <tr>
+    <td width="70%"><img src="docs/assets/web-room-live.png" alt="Real desktop Web listening room with a synchronized Jay Chou queue" /></td>
+    <td width="30%"><img src="docs/assets/web-room-mobile.png" alt="Real mobile Web listening room showing Jay Chou albums" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Desktop: shared playback, queue, progress and room presence</sub></td>
+    <td align="center"><sub>Mobile: the same room and catalog at 390 px</sub></td>
+  </tr>
+</table>
 
-The same invitation opens the full Web room:
-
-![Desktop Web listening room](docs/assets/web-room-live.png)
-
-Songs, albums and artists now use Navidrome's own OpenSubsonic library APIs:
-
-![Songs, albums and artists in the request desk](docs/assets/web-room-catalog-live.png)
-
-<img src="docs/assets/web-room-mobile.png" width="390" alt="Mobile Web listening room" />
+<table>
+  <tr>
+    <td width="68%"><img src="docs/assets/admin-ui-live.png" alt="Room management opened from Navidrome" /></td>
+    <td width="32%"><img src="docs/assets/share-dialog-live.png" alt="Share link and QR dialog" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Open the management console from the stock plugin Website link.</sub></td>
+    <td align="center"><sub>Create private links and QR codes locally in the browser.</sub></td>
+  </tr>
+</table>
 
 ## Downloads
 
@@ -232,9 +256,14 @@ More details: [compatibility](docs/COMPATIBILITY.md), [updates](docs/UPDATES.md)
 
 ## MusicMate app preview
 
-MusicMate is the upcoming native companion for iOS and Android. It will scan the same room QR code, keep Navidrome credentials in the system credential store, use Navidrome as its music source and join the exact same synchronized queue as Web listeners. The Web room remains fully usable without the app.
+MusicMate is the upcoming native companion for iOS and Android. It will scan the same room QR code, keep Navidrome credentials in the system credential store, use Navidrome as its music source and join the exact same synchronized queue as Web listeners. The accepted artwork below is now the canonical source for the next app icon. The Web room remains fully usable without the app.
 
-![MusicMate app preview](docs/assets/musicmate-demo.gif)
+<table>
+  <tr>
+    <td width="24%" align="center"><img src="docs/assets/musicmate-app-icon-source.png" width="150" alt="Accepted MusicMate app icon for the next release" /><br /><sub>Next app icon</sub></td>
+    <td width="76%"><strong>Coming next: the native MusicMate companion</strong><br /><br />Scan a room QR code, connect Navidrome as the music source, keep credentials in the system keychain and join the same Web queue from iOS or Android.<br /><br /><sub>The app screen will be added here after the next real device build is ready.</sub></td>
+  </tr>
+</table>
 
 ## Work with us
 

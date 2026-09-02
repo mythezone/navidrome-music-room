@@ -32,6 +32,8 @@
 - Songs, Albums, and Artists browsing in the Web request desk.
 - Whole-album requests using the listener's own music-folder permissions.
 - Usage-first release documentation, branding, and ready-to-run Compose bundle.
+- Adopt `docs/assets/musicmate-app-icon-source.png` as the canonical icon source
+  for the next MusicMate iOS and Android release.
 - Continue testing against stock Navidrome without a maintained fork.
 
 ## Later

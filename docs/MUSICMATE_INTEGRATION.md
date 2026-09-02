@@ -4,6 +4,19 @@ The HTTPS invitation is also the browser client URL in v1.0. MusicMate should
 continue claiming the `musicmate://` deep link, while normal HTTPS navigation
 must remain available as a complete fallback rather than forcing an app install.
 
+## App icon for the next release
+
+Use [`musicmate-app-icon-source.png`](assets/musicmate-app-icon-source.png)
+as the canonical artwork for the next MusicMate app release. Keep the coral
+rounded frame and waveform, plus the two cyan endpoints, unchanged. Platform
+packaging should derive its assets from this original 1254 × 1254 RGBA file:
+
+- export an opaque 1024 × 1024 App Store icon for iOS without applying a second
+  rounded-corner mask inside the artwork;
+- export Android adaptive foreground/background layers while preserving the
+  current safe area;
+- compare generated icons against the source before publishing the app update.
+
 ## Provider boundary
 
 Existing FAIO rooms remain unchanged. Add a provider discriminator and preserve old Codable defaults:

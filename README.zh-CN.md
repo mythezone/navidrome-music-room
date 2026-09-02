@@ -1,10 +1,11 @@
 <p align="center">
-  <img src="docs/assets/logo.png" width="148" alt="Navidrome Music Room 标志" />
+  <img src="docs/assets/musicmate-app-icon-source.png" width="148" alt="Navidrome Music Room 标志" />
 </p>
 
 <h1 align="center">Navidrome Music Room</h1>
 
-<p align="center"><strong>把自己的 Navidrome 曲库变成私密、同步的一起听歌房。</strong></p>
+<p align="center"><strong>把自己的 Navidrome 曲库变成私密、同步的一起听歌房。</strong><br />
+<sub>在 Navidrome 中创建 · 分享一个链接或二维码 · 电脑和手机一起听</sub></p>
 
 <p align="center">
   <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev"><img alt="版本" src="https://img.shields.io/badge/version-v1.1.0--dev-ff6b57"></a>
@@ -19,20 +20,30 @@
   <a href="CONTRIBUTING.md"><img alt="欢迎 PR" src="https://img.shields.io/badge/PRs-welcome-brightgreen"></a>
 </p>
 
-<p align="center"><a href="README.md">English</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">下载</a> · <a href="#快速安装">安装</a> · <a href="#使用听歌房">使用</a></p>
+<p align="center"><strong><a href="README.md">English</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">下载 v1.1.0-dev</a> · <a href="#快速安装">快速安装</a> · <a href="#使用听歌房">使用教程</a></strong></p>
 
-![桌面与手机上的 Navidrome Music Room](docs/assets/hero.png)
+<p align="center"><img src="docs/assets/hero.png" width="100%" alt="自托管服务器、桌面与手机上的 Navidrome Music Room" /></p>
 
-管理员从 Navidrome 插件页面创建房间并分享链接或二维码，受邀用户使用自己的 Navidrome 账号，直接在桌面或手机浏览器里一起听歌。音频由 Navidrome 直接提供，房间服务负责同步播放、暂停、进度、切歌、待播列表与断线重连。
+<table>
+  <tr>
+    <td width="33%" align="center"><strong>① 创建房间</strong><br /><sub>管理员从插件 Website 打开管理页并创建房间。</sub></td>
+    <td width="33%" align="center"><strong>② 分享邀请</strong><br /><sub>复制私密链接，或让朋友扫描本地生成的二维码。</sub></td>
+    <td width="33%" align="center"><strong>③ 一起听歌</strong><br /><sub>受邀 Navidrome 用户进入同一个同步播放队列。</sub></td>
+  </tr>
+</table>
 
-当前预览版本：**v1.1.0-dev**。这一版补齐了点歌台的 **歌曲 / 专辑 / 歌手** 三种浏览方式，以及整张专辑点播。
+每个人都使用自己的 Navidrome 账号，并保持自己的曲库权限。音频直接从 Navidrome 播放，听歌房同步播放、暂停、进度、切歌、点播与断线重连。当前预览版 **v1.1.0-dev** 已补齐 **歌曲 / 专辑 / 歌手** 三种选歌方式与整张专辑点播。
 
 ## 适合这些场景
 
-- 异地朋友一起听同一张专辑，所有人的播放位置保持一致。
-- 家庭成员共用自建曲库，但每个人仍使用自己的账号和曲库权限。
-- 聚会、工作室或小团队建立私密房间，成员点歌，房主统一控制播放。
-- 先从 Navidrome 分享听歌房，未来也可使用 MusicMate App 扫描同一个二维码加入。
+<table>
+  <tr>
+    <td width="25%"><strong>🌍 异地朋友</strong><br /><sub>一起听同一张专辑，所有人保持在同一秒。</sub></td>
+    <td width="25%"><strong>🏠 家庭曲库</strong><br /><sub>保留各自账号与权限，不用分享管理员密码。</sub></td>
+    <td width="25%"><strong>🎉 私密聚会</strong><br /><sub>成员自由点歌，房主负责全局播放控制。</sub></td>
+    <td width="25%"><strong>📱 Web + App</strong><br /><sub>现在浏览器直接使用，未来可用 MusicMate 加入。</sub></td>
+  </tr>
+</table>
 
 ## 已实现功能
 
@@ -49,23 +60,36 @@
 | 每个用户按自己的权限直连 Navidrome 音频 | ✅ |
 | 群聊、更丰富的房间动态和社区统计 | 开源路线图 |
 
-通过 Navidrome 插件详情中的 **Website** 打开管理页：
+## 真实界面
 
-![从 Navidrome 打开的听歌房管理页](docs/assets/admin-ui-live.png)
+下面的图片由正在运行的 v1.1.0-dev 和真实 Navidrome 曲库直接生成。点歌台筛选为周杰伦，未使用虚构专辑、替换文字或模拟封面。
 
-管理页可在浏览器本地生成邀请链接和二维码：
+<p align="center">
+  <img src="docs/assets/web-room-catalog-live.png" width="100%" alt="Navidrome Music Room 点歌台中的真实周杰伦专辑结果" /><br />
+  <sub>按歌曲、专辑或歌手搜索 Navidrome，然后点播单曲或整张专辑。</sub>
+</p>
 
-![分享链接与二维码](docs/assets/share-dialog-live.png)
+<table>
+  <tr>
+    <td width="70%"><img src="docs/assets/web-room-live.png" alt="带有周杰伦同步待播队列的真实桌面 Web 听歌房" /></td>
+    <td width="30%"><img src="docs/assets/web-room-mobile.png" alt="显示周杰伦专辑的真实手机 Web 听歌房" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>桌面：共同播放、待播、进度与房间在线状态</sub></td>
+    <td align="center"><sub>手机：390 px 下的同一房间与曲库</sub></td>
+  </tr>
+</table>
 
-同一个邀请可以直接打开完整 Web 听歌房：
-
-![桌面 Web 听歌房](docs/assets/web-room-live.png)
-
-歌曲、专辑和歌手页面现在直接复用 Navidrome 的 OpenSubsonic 曲库接口：
-
-![点歌台中的歌曲、专辑与歌手](docs/assets/web-room-catalog-live.png)
-
-<img src="docs/assets/web-room-mobile.png" width="390" alt="手机 Web 听歌房" />
+<table>
+  <tr>
+    <td width="68%"><img src="docs/assets/admin-ui-live.png" alt="从 Navidrome 打开的听歌房管理页" /></td>
+    <td width="32%"><img src="docs/assets/share-dialog-live.png" alt="分享链接与二维码对话框" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>通过原生插件详情中的 Website 打开房间管理页。</sub></td>
+    <td align="center"><sub>在浏览器本地生成私密链接和二维码。</sub></td>
+  </tr>
+</table>
 
 ## 下载
 
@@ -232,9 +256,14 @@ ${Plugins.Folder}/navidrome-music-room/room-data/
 
 ## MusicMate App 预告
 
-MusicMate 是接下来发布的 iOS / Android 原生客户端。它会扫描同一个房间二维码，把 Navidrome 凭据保存在系统凭据存储中，以 Navidrome 作为音源，并与 Web 用户加入同一个同步待播队列。没有 App 时，Web 听歌房仍然可以完整使用。
+MusicMate 是接下来发布的 iOS / Android 原生客户端。它会扫描同一个房间二维码，把 Navidrome 凭据保存在系统凭据存储中，以 Navidrome 作为音源，并与 Web 用户加入同一个同步待播队列。下面已经确认的图稿会作为下一版 App 图标的标准源文件。没有 App 时，Web 听歌房仍然可以完整使用。
 
-![MusicMate App 预览](docs/assets/musicmate-demo.gif)
+<table>
+  <tr>
+    <td width="24%" align="center"><img src="docs/assets/musicmate-app-icon-source.png" width="150" alt="下一版采用的 MusicMate App 图标" /><br /><sub>下一版 App 图标</sub></td>
+    <td width="76%"><strong>接下来：MusicMate 原生客户端</strong><br /><br />扫描房间二维码，以 Navidrome 作为音源，把凭据保存在系统钥匙串中，并从 iOS 或 Android 加入与 Web 相同的待播队列。<br /><br /><sub>下一版真实设备构建完成后，再在这里加入 App 实机截图。</sub></td>
+  </tr>
+</table>
 
 ## 合作方式
 
