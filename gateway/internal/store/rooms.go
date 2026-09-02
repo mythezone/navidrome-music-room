@@ -110,7 +110,7 @@ func (s *Store) ListRooms(ctx context.Context, username string, isAdmin bool) ([
 		return nil, err
 	}
 	defer rows.Close()
-	var result []domain.Room
+	result := make([]domain.Room, 0)
 	for rows.Next() {
 		room, err := scanRoom(rows)
 		if err != nil {
@@ -213,7 +213,7 @@ FROM members WHERE room_id = ? ORDER BY role DESC, joined_unix_ms`, roomID)
 		return nil, err
 	}
 	defer rows.Close()
-	var result []domain.Member
+	result := make([]domain.Member, 0)
 	for rows.Next() {
 		member, err := scanMember(rows)
 		if err != nil {

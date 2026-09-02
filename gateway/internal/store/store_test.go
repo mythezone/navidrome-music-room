@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -66,22 +67,41 @@ func TestPlaybackRevisionQueueAndEmptyPause(t *testing.T) {
 	room := createTestRoom(t, storage)
 	for index, contributor := range []string{"alice", "bob"} {
 		id := []string{"cccccccccccccccc", "dddddddddddddddd"}[index]
-		_, err := storage.AddQueueEntry(t.Context(), room, domain.QueueEntry{
+		_, primed, err := storage.AddQueueEntry(t.Context(), room, domain.QueueEntry{
 			QueueID: id, RoomID: room.RoomID, Contributor: contributor, ContributorName: contributor,
 			Track: domain.NavidromeTrackRef{ID: "track-" + contributor, MusicFolderID: 1, Title: contributor, DurationSeconds: 100},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
+		if index == 0 && (primed == nil || primed.Revision != 1 || primed.Status != domain.PlaybackPaused || primed.CurrentTrack == nil) {
+			t.Fatalf("first queue item was not promoted to paused playback: %#v", primed)
+		}
+		if index == 1 && primed != nil {
+			t.Fatalf("adding to an active room unexpectedly replaced playback: %#v", primed)
+		}
 	}
-	state, err := storage.ApplyPlayback(t.Context(), room.RoomID, "play", nil, 0, "admin")
+	beforePlay, err := storage.Playback(t.Context(), room.RoomID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.Revision != 1 || state.Status != domain.PlaybackPlaying || state.CurrentTrack == nil {
+	if beforePlay.Revision != 1 || beforePlay.Status != domain.PlaybackPaused || beforePlay.CurrentTrack == nil || beforePlay.CurrentTrack.ID != "track-alice" || beforePlay.NextTrack == nil || beforePlay.NextTrack.ID != "track-bob" {
+		t.Fatalf("queue priming did not preserve current/next ordering: %#v", beforePlay)
+	}
+	if history, err := storage.History(t.Context(), room.RoomID, 10, 0); err != nil || len(history) != 0 {
+		t.Fatalf("a paused primed track must not enter history before playback: %#v err=%v", history, err)
+	}
+	state, err := storage.ApplyPlayback(t.Context(), room.RoomID, "play", nil, 1, "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Revision != 2 || state.Status != domain.PlaybackPlaying || state.CurrentTrack == nil {
 		t.Fatalf("unexpected playback state: %#v", state)
 	}
-	if _, err := storage.ApplyPlayback(t.Context(), room.RoomID, "pause", nil, 0, "admin"); err == nil {
+	if history, err := storage.History(t.Context(), room.RoomID, 10, 0); err != nil || len(history) != 1 || history[0].Track.ID != "track-alice" {
+		t.Fatalf("playing the primed track did not create history: %#v err=%v", history, err)
+	}
+	if _, err := storage.ApplyPlayback(t.Context(), room.RoomID, "pause", nil, 1, "admin"); err == nil {
 		t.Fatal("expected stale revision conflict")
 	} else if roomErr, ok := err.(*domain.Error); !ok || roomErr.Code != "revision_conflict" {
 		t.Fatalf("expected revision_conflict, got %T %v", err, err)
@@ -89,6 +109,34 @@ func TestPlaybackRevisionQueueAndEmptyPause(t *testing.T) {
 	paused, changed, err := storage.PauseForEmpty(t.Context(), room.RoomID)
 	if err != nil || !changed || paused.Status != domain.PlaybackPaused || !paused.PausedForEmpty {
 		t.Fatalf("empty room pause failed: %#v changed=%v err=%v", paused, changed, err)
+	}
+}
+
+func TestPrimePlaybackIfIdleRepairsLegacyPendingQueue(t *testing.T) {
+	storage, _ := openTestStore(t)
+	room := createTestRoom(t, storage)
+	trackJSON, err := json.Marshal(domain.NavidromeTrackRef{
+		ID: "legacy-track", MusicFolderID: 1, Title: "Legacy", DurationSeconds: 120,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.db.ExecContext(t.Context(), `
+INSERT INTO queue(queue_id, room_id, position, track_json, contributor_username, contributor_display_name, created_unix_ms)
+VALUES (?, ?, 1, ?, ?, ?, ?)`, "eeeeeeeeeeeeeeee", room.RoomID, string(trackJSON), "member", "Member", unixMillis(time.Now().UTC())); err != nil {
+		t.Fatal(err)
+	}
+
+	state, changed, err := storage.PrimePlaybackIfIdle(t.Context(), room.RoomID, "__test_recovery__")
+	if err != nil || !changed || state.Revision != 1 || state.Status != domain.PlaybackPaused || state.CurrentTrack == nil || state.CurrentTrack.ID != "legacy-track" {
+		t.Fatalf("legacy queue recovery failed: state=%#v changed=%v err=%v", state, changed, err)
+	}
+	if queue, err := storage.ListQueue(t.Context(), room.RoomID); err != nil || len(queue) != 0 {
+		t.Fatalf("recovered current item remained pending: %#v err=%v", queue, err)
+	}
+	state, changed, err = storage.PrimePlaybackIfIdle(t.Context(), room.RoomID, "__test_recovery__")
+	if err != nil || changed || state.Revision != 1 {
+		t.Fatalf("idle recovery was not idempotent: state=%#v changed=%v err=%v", state, changed, err)
 	}
 }
 
@@ -115,7 +163,7 @@ func TestBackupAndRestartPersistence(t *testing.T) {
 	}
 }
 
-func TestPluginStatePersistsLicenseChannelAndRejectsStaleGeneration(t *testing.T) {
+func TestPluginStatePersistsUpdateChannelAndRejectsStaleGeneration(t *testing.T) {
 	storage, _ := openTestStore(t)
 	receivedAt := time.Now().UTC().Truncate(time.Millisecond)
 	input := domain.PluginSync{
@@ -123,7 +171,6 @@ func TestPluginStatePersistsLicenseChannelAndRejectsStaleGeneration(t *testing.T
 		Generation:         8,
 		NavidromePublicURL: "https://music.example.test",
 		GatewayPublicURL:   "https://rooms.example.test",
-		LicenseFile:        "secrets/customer.license.json",
 		UpdateChannel:      "beta",
 		Users:              []domain.PluginUser{{Username: "admin", DisplayName: "Admin", Admin: true}},
 	}
@@ -134,7 +181,7 @@ func TestPluginStatePersistsLicenseChannelAndRejectsStaleGeneration(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.PluginVersion != input.PluginVersion || state.LicenseFile != input.LicenseFile || state.UpdateChannel != "beta" || len(state.Users) != 1 || !state.Users[0].Admin {
+	if state.PluginVersion != input.PluginVersion || state.UpdateChannel != "beta" || len(state.Users) != 1 || !state.Users[0].Admin {
 		t.Fatalf("plugin state was not preserved: %#v", state)
 	}
 	input.Generation = 7

@@ -1,5 +1,9 @@
 # MusicMate integration
 
+The HTTPS invitation is also the browser client URL in v1.0. MusicMate should
+continue claiming the `musicmate://` deep link, while normal HTTPS navigation
+must remain available as a complete fallback rather than forcing an app install.
+
 ## Provider boundary
 
 Existing FAIO rooms remain unchanged. Add a provider discriminator and preserve old Codable defaults:
@@ -47,14 +51,26 @@ Do not use a URL broadcast by another client. `NavidromeTrackRef` is the shared 
 The parser accepts:
 
 - `https://gateway.example/join/{roomID}#invite={secret}`
+- `https://music.example/music-room/join/{roomID}#invite={secret}` (same-origin Compose deployment)
 - `musicmate://join?server=...&gateway=...&room=...&invite=...`
 - existing FAIO `/listen/{roomID}` and `musicmate://room/{roomID}?server=...` links
 
 Parse the HTTPS fragment locally and clear it from any displayed/logged URL. Generate QR images locally; do not send invitation URLs to a third-party QR service.
 
+When `gatewayBaseURL` contains a path prefix such as `/music-room`, preserve it
+when appending `/api/v1`; do not rebuild the endpoint from only scheme and host.
+
 ## WebSocket
 
 POST `/ws-ticket`, then connect once to the returned URL. A rejected or reused ticket requires a new request. On reconnect, fetch a new snapshot and calculate playing position from `positionSeconds`, `anchorServerTime`, and the newly observed local/server clock delta.
+
+The first successful queue request promotes the selected track to
+`playback.currentTrack` with status `paused` and increments `revision`. Managers
+must use the primary play button to send the shared `play`/`pause` command;
+ordinary members' primary button only changes local listening. Every device then
+advances the server-authoritative position locally and corrects drift on playback
+events, seeks, track changes, and reconnect snapshots. Audio continues to stream
+directly from Navidrome with that device's own OpenSubsonic credentials.
 
 ## Navidrome plugin activation adapter
 

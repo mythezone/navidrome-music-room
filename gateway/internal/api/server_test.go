@@ -161,6 +161,85 @@ func TestPublicDiscoveryContainsOnlyConnectionMetadata(t *testing.T) {
 	}
 }
 
+func TestAdminUIIsEmbeddedAndUsesStrictBrowserHeaders(t *testing.T) {
+	fixture := newAPIFixture(t)
+	response := fixture.request(t, http.MethodGet, "/admin/", nil, "")
+	body := readBody(response)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(body, "听歌房 · Navidrome") {
+		t.Fatalf("embedded admin UI failed: status=%d body=%s", response.StatusCode, body)
+	}
+	if !strings.Contains(response.Header.Get("Content-Security-Policy"), "script-src 'self'") || response.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("admin UI security headers are incomplete: %v", response.Header)
+	}
+
+	marker := `src="./assets/`
+	start := strings.Index(body, marker)
+	if start < 0 {
+		t.Fatalf("admin UI asset was not referenced: %s", body)
+	}
+	start += len(`src=".`)
+	end := strings.Index(body[start:], `"`)
+	if end < 0 {
+		t.Fatalf("admin UI asset reference is malformed: %s", body)
+	}
+	assetPath := "/admin" + body[start:start+end]
+	response = fixture.request(t, http.MethodGet, assetPath, nil, "")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(response.Header.Get("Content-Type"), "javascript") {
+		t.Fatalf("embedded admin UI asset failed: status=%d headers=%v", response.StatusCode, response.Header)
+	}
+}
+
+func TestRoomUIIsEmbeddedAndStreamsAssetsWithStrictHeaders(t *testing.T) {
+	fixture := newAPIFixture(t)
+	roomID := "0123456789abcdef0123456789abcdef"
+	response := fixture.request(t, http.MethodGet, "/join/"+roomID+"/", nil, "")
+	body := readBody(response)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(body, "一起听歌 · Navidrome") {
+		t.Fatalf("embedded room UI failed: status=%d body=%s", response.StatusCode, body)
+	}
+	csp := response.Header.Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'self'") || !strings.Contains(csp, "media-src 'self' blob:") || response.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("room UI security headers are incomplete: %v", response.Header)
+	}
+
+	marker := `src="./assets/`
+	start := strings.Index(body, marker)
+	if start < 0 {
+		t.Fatalf("room UI asset was not referenced: %s", body)
+	}
+	start += len(`src=".`)
+	end := strings.Index(body[start:], `"`)
+	if end < 0 {
+		t.Fatalf("room UI asset reference is malformed: %s", body)
+	}
+	assetPath := "/join/" + roomID + body[start:start+end]
+	response = fixture.request(t, http.MethodGet, assetPath, nil, "")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(response.Header.Get("Content-Type"), "javascript") {
+		t.Fatalf("embedded room UI asset failed: status=%d headers=%v", response.StatusCode, response.Header)
+	}
+	if !strings.Contains(response.Header.Get("Cache-Control"), "immutable") {
+		t.Fatalf("room UI asset is not immutable: %v", response.Header)
+	}
+}
+
+func TestRoomUIRedirectUsesRelativeLocationForProxyPrefix(t *testing.T) {
+	fixture := newAPIFixture(t)
+	roomID := "0123456789abcdef0123456789abcdef"
+	client := &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	response, err := client.Get(fixture.server.URL + "/join/" + roomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusPermanentRedirect || response.Header.Get("Location") != roomID+"/" {
+		t.Fatalf("unexpected room redirect: status=%d location=%q", response.StatusCode, response.Header.Get("Location"))
+	}
+}
+
 func TestReadinessReportsGatewayAndPluginVersions(t *testing.T) {
 	fixture := newAPIFixture(t)
 	response := fixture.request(t, http.MethodGet, "/readyz", nil, "")
@@ -218,7 +297,7 @@ func TestDiagnosticExportIsAdminOnlyAndRedacted(t *testing.T) {
 	}
 	for _, secret := range []string{
 		fixture.pairing, "https://music.example.test", "https://rooms.example.test",
-		`"username"`, `"displayName"`, `"licenseID"`, `"subject"`,
+		`"username"`, `"displayName"`,
 	} {
 		if bytes.Contains(payload, []byte(secret)) {
 			t.Fatalf("diagnostic export leaked %q: %s", secret, payload)
@@ -252,6 +331,51 @@ func TestPluginAuthorizationRemovalRevokesExistingSessions(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("removed user session remained valid: %d %s", response.StatusCode, readBody(response))
+	}
+}
+
+func TestEmptyCollectionsSerializeAsArrays(t *testing.T) {
+	fixture := newAPIFixture(t)
+	memberToken := fixture.exchange(t, "member")
+	response := fixture.request(t, http.MethodGet, "/api/v1/rooms", nil, memberToken)
+	roomsBody := readBody(response)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(roomsBody, `"rooms":[]`) {
+		t.Fatalf("empty room list must be a JSON array: status=%d body=%s", response.StatusCode, roomsBody)
+	}
+
+	adminToken := fixture.exchange(t, "admin")
+	response = fixture.request(t, http.MethodPost, "/api/v1/rooms", map[string]any{
+		"name": "Empty Collections", "musicFolderIDs": []int{1},
+	}, adminToken)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("create room failed: %d %s", response.StatusCode, readBody(response))
+	}
+	var room domain.Room
+	if err := json.NewDecoder(response.Body).Decode(&room); err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+
+	response = fixture.request(t, http.MethodGet, "/api/v1/rooms/"+room.RoomID+"/snapshot", nil, adminToken)
+	snapshotBody := readBody(response)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(snapshotBody, `"queue":[]`) || !strings.Contains(snapshotBody, `"history":[]`) {
+		t.Fatalf("snapshot collections must be JSON arrays: status=%d body=%s", response.StatusCode, snapshotBody)
+	}
+
+	response = fixture.request(t, http.MethodGet, "/api/v1/rooms/"+room.RoomID+"/history", nil, adminToken)
+	historyBody := readBody(response)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(historyBody, `"items":[]`) {
+		t.Fatalf("empty history must be a JSON array: status=%d body=%s", response.StatusCode, historyBody)
+	}
+
+	response = fixture.request(t, http.MethodGet, "/api/v1/rooms/"+room.RoomID+"/invites", nil, adminToken)
+	invitesBody := readBody(response)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || !strings.Contains(invitesBody, `"invites":[]`) {
+		t.Fatalf("empty invite list must be a JSON array: status=%d body=%s", response.StatusCode, invitesBody)
 	}
 }
 
@@ -350,8 +474,8 @@ func TestAdminInvitationAndMemberPermissions(t *testing.T) {
 	response.Body.Close()
 
 	response = fixture.request(t, http.MethodGet, "/api/v1/rooms/"+room.RoomID+"/chat", nil, memberToken)
-	if response.StatusCode != 402 {
-		t.Fatalf("chat should be license locked: %d %s", response.StatusCode, readBody(response))
+	if response.StatusCode != http.StatusNotImplemented {
+		t.Fatalf("chat should be reported as not implemented: %d %s", response.StatusCode, readBody(response))
 	}
 	response.Body.Close()
 }
@@ -412,7 +536,7 @@ func TestThreeClientsReceiveAuthoritativePlaybackAndReconnect(t *testing.T) {
 		if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
 			t.Fatal(err)
 		}
-		if payload.Playback.Revision != 0 {
+		if payload.Playback.Revision != 1 || payload.Playback.Status != domain.PlaybackPaused || payload.Playback.CurrentTrack == nil {
 			t.Fatalf("new client received stale initial revision: %#v", payload.Playback)
 		}
 	}
@@ -433,7 +557,7 @@ func TestThreeClientsReceiveAuthoritativePlaybackAndReconnect(t *testing.T) {
 	}
 
 	response = fixture.request(t, http.MethodPost, "/api/v1/rooms/"+room.RoomID+"/playback", map[string]any{
-		"command": "play", "expectedRevision": 0,
+		"command": "play", "expectedRevision": 1,
 	}, adminToken)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("play failed: %d %s", response.StatusCode, readBody(response))
@@ -441,13 +565,13 @@ func TestThreeClientsReceiveAuthoritativePlaybackAndReconnect(t *testing.T) {
 	response.Body.Close()
 	for _, connection := range connections {
 		event := readWebSocketEvent(t, connection, "playback")
-		if event.Revision != 1 {
-			t.Fatalf("client did not receive playback revision 1: %#v", event)
+		if event.Revision != 2 {
+			t.Fatalf("client did not receive playback revision 2: %#v", event)
 		}
 	}
 
 	response = fixture.request(t, http.MethodPost, "/api/v1/rooms/"+room.RoomID+"/playback", map[string]any{
-		"command": "seek", "expectedRevision": 1, "positionSeconds": 42,
+		"command": "seek", "expectedRevision": 2, "positionSeconds": 42,
 	}, adminToken)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("seek failed: %d %s", response.StatusCode, readBody(response))
@@ -455,8 +579,8 @@ func TestThreeClientsReceiveAuthoritativePlaybackAndReconnect(t *testing.T) {
 	response.Body.Close()
 	for _, connection := range connections {
 		event := readWebSocketEvent(t, connection, "playback")
-		if event.Revision != 2 {
-			t.Fatalf("client did not receive seek revision 2: %#v", event)
+		if event.Revision != 3 {
+			t.Fatalf("client did not receive seek revision 3: %#v", event)
 		}
 	}
 
@@ -468,16 +592,71 @@ func TestThreeClientsReceiveAuthoritativePlaybackAndReconnect(t *testing.T) {
 	if err := json.Unmarshal(snapshot.Payload, &restored); err != nil {
 		t.Fatal(err)
 	}
-	if restored.Playback.Revision != 2 || restored.Playback.PositionSeconds < 42 {
+	if restored.Playback.Revision != 3 || restored.Playback.PositionSeconds < 42 {
 		t.Fatalf("reconnect did not restore authoritative playback: %#v", restored.Playback)
 	}
 
 	response = fixture.request(t, http.MethodPost, "/api/v1/rooms/"+room.RoomID+"/playback", map[string]any{
-		"command": "pause", "expectedRevision": 1,
+		"command": "pause", "expectedRevision": 2,
 	}, adminToken)
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusConflict {
 		t.Fatalf("stale revision overwrote newer playback: %d %s", response.StatusCode, readBody(response))
+	}
+}
+
+func TestFirstQueueTrackBroadcastsPausedCurrentPlayback(t *testing.T) {
+	fixture := newAPIFixture(t)
+	adminToken := fixture.exchange(t, "admin")
+	response := fixture.request(t, http.MethodPost, "/api/v1/rooms", map[string]any{
+		"name": "Prime First Track", "musicFolderIDs": []int{1},
+	}, adminToken)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("create room failed: %d %s", response.StatusCode, readBody(response))
+	}
+	var room domain.Room
+	if err := json.NewDecoder(response.Body).Decode(&room); err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+
+	connection := fixture.connectWebSocket(t, room.RoomID, adminToken)
+	defer connection.Close()
+	_ = readWebSocketEvent(t, connection, "snapshot")
+
+	response = fixture.request(t, http.MethodPost, "/api/v1/rooms/"+room.RoomID+"/queue/tracks", map[string]any{
+		"track": map[string]any{"id": "track-e2e", "musicFolderID": 1},
+	}, adminToken)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("queue track failed: %d %s", response.StatusCode, readBody(response))
+	}
+	var mutation struct {
+		Queue    []domain.QueueEntry   `json:"queue"`
+		Playback *domain.PlaybackState `json:"playback"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&mutation); err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if mutation.Playback == nil || mutation.Playback.Revision != 1 || mutation.Playback.Status != domain.PlaybackPaused || mutation.Playback.CurrentTrack == nil || len(mutation.Queue) != 0 {
+		t.Fatalf("first queue mutation did not expose primed playback: %#v", mutation)
+	}
+
+	event := readWebSocketEvent(t, connection, "playback")
+	var playback domain.PlaybackState
+	if err := json.Unmarshal(event.Payload, &playback); err != nil {
+		t.Fatal(err)
+	}
+	if event.Revision != 1 || playback.Status != domain.PlaybackPaused || playback.CurrentTrack == nil || playback.CurrentTrack.ID != "track-e2e" {
+		t.Fatalf("client did not receive the primed current track: event=%#v playback=%#v", event, playback)
+	}
+	queueEvent := readWebSocketEvent(t, connection, "queue")
+	var queue []domain.QueueEntry
+	if err := json.Unmarshal(queueEvent.Payload, &queue); err != nil || len(queue) != 0 {
+		t.Fatalf("promoted track remained in the pending queue: %#v err=%v", queue, err)
+	}
+	if history, err := fixture.store.History(t.Context(), room.RoomID, 10, 0); err != nil || len(history) != 0 {
+		t.Fatalf("priming created playback history too early: %#v err=%v", history, err)
 	}
 }
 

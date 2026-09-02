@@ -1,12 +1,22 @@
-VERSION ?= 0.1.0-dev
+VERSION ?= 1.1.0-dev
 GO_IMAGE ?= golang:1.25-bookworm
 GOPROXY ?= https://proxy.golang.org,direct
 
-.PHONY: test race vet plugin build validate-plugin validate-openapi validate-compose clean
+.PHONY: test frontend race vet plugin build validate-plugin validate-openapi validate-compose clean
 
-test:
+test: frontend
 	docker run --rm -e GOPROXY=$(GOPROXY) -v navidrome_music_room_go_cache:/go/pkg/mod -v $(CURDIR)/gateway:/src -w /src $(GO_IMAGE) sh -c 'go test ./...'
 	docker run --rm -e GOPROXY=$(GOPROXY) -v navidrome_music_room_go_cache:/go/pkg/mod -v $(CURDIR)/plugin:/src -w /src $(GO_IMAGE) sh -c 'go test ./...'
+
+frontend:
+	npm --prefix admin-ui ci
+	npm --prefix admin-ui audit --audit-level=moderate
+	npm --prefix admin-ui test
+	npm --prefix admin-ui run build
+	npm --prefix room-ui ci
+	npm --prefix room-ui audit --audit-level=high
+	npm --prefix room-ui test
+	npm --prefix room-ui run build
 
 race:
 	docker run --rm -e GOPROXY=$(GOPROXY) -v navidrome_music_room_go_cache:/go/pkg/mod -v $(CURDIR)/gateway:/src -w /src $(GO_IMAGE) sh -c 'go test -race ./...'

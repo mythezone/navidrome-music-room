@@ -5,40 +5,40 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mythezone/navidrome-music-room/gateway/internal/adminui"
 	"github.com/mythezone/navidrome-music-room/gateway/internal/auth"
 	"github.com/mythezone/navidrome-music-room/gateway/internal/config"
 	"github.com/mythezone/navidrome-music-room/gateway/internal/domain"
-	"github.com/mythezone/navidrome-music-room/gateway/internal/entitlement"
 	"github.com/mythezone/navidrome-music-room/gateway/internal/realtime"
+	"github.com/mythezone/navidrome-music-room/gateway/internal/roomui"
 	"github.com/mythezone/navidrome-music-room/gateway/internal/store"
 	updatemanager "github.com/mythezone/navidrome-music-room/gateway/internal/update"
 )
 
 type Server struct {
-	config              config.Config
-	store               *store.Store
-	sessions            *auth.SessionManager
-	hub                 *realtime.Hub
-	tickets             *realtime.Tickets
-	logger              *slog.Logger
-	mux                 *http.ServeMux
-	upgrader            websocket.Upgrader
-	authLimiter         *rateLimiter
-	mutationLimiter     *rateLimiter
-	inviteLimiter       *rateLimiter
-	idempotency         *idempotencyCache
-	updater             *updatemanager.Manager
-	entitlementProvider *entitlement.Provider
-	restart             func()
+	config          config.Config
+	store           *store.Store
+	sessions        *auth.SessionManager
+	hub             *realtime.Hub
+	tickets         *realtime.Tickets
+	logger          *slog.Logger
+	mux             *http.ServeMux
+	upgrader        websocket.Upgrader
+	authLimiter     *rateLimiter
+	mutationLimiter *rateLimiter
+	inviteLimiter   *rateLimiter
+	idempotency     *idempotencyCache
+	updater         *updatemanager.Manager
+	restart         func()
 }
 
 func NewServer(cfg config.Config, storage *store.Store, sessions *auth.SessionManager, logger *slog.Logger) (*Server, error) {
@@ -54,7 +54,6 @@ func NewServer(cfg config.Config, storage *store.Store, sessions *auth.SessionMa
 		logger: logger, mux: http.NewServeMux(), authLimiter: newRateLimiter(10, time.Minute),
 		mutationLimiter: newRateLimiter(120, time.Minute), inviteLimiter: newRateLimiter(30, time.Minute),
 		idempotency: newIdempotencyCache(15*time.Minute, 2048), updater: updater,
-		entitlementProvider: entitlement.NewProvider(cfg.DataDir, cfg.LicensePublicKey),
 	}
 	server.hub = realtime.NewHub(cfg.EmptyRoomPauseDelay, server.pauseForEmpty, logger)
 	server.upgrader = websocket.Upgrader{
@@ -75,9 +74,12 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) routes() {
+	s.mux.Handle("GET /admin", adminui.Handler())
+	s.mux.Handle("GET /admin/{path...}", adminui.Handler())
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /readyz", s.ready)
-	s.mux.HandleFunc("GET /join/{room_id}", s.joinLanding)
+	s.mux.HandleFunc("GET /join/{room_id}", s.redirectRoomUI)
+	s.mux.Handle("GET /join/{room_id}/", roomui.Handler())
 	s.mux.HandleFunc("GET /api/v1/discovery", s.discovery)
 	s.mux.HandleFunc("POST /internal/v1/plugin-sync", s.pluginSync)
 	s.mux.HandleFunc("POST /api/v1/auth/exchange", s.authExchange)
@@ -105,20 +107,41 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/v1/rooms/{room_id}/queue/order", s.reorderQueue)
 	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/ws-ticket", s.issueWebSocketTicket)
 	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/ws", s.webSocket)
-	s.mux.HandleFunc("GET /api/v1/entitlements", s.entitlements)
+	s.mux.HandleFunc("GET /api/v1/capabilities", s.featureAvailability)
+	// Keep the v1.0 route during the protocol transition. New clients use /capabilities.
+	s.mux.HandleFunc("GET /api/v1/entitlements", s.featureAvailability)
 	s.mux.HandleFunc("GET /api/v1/admin/diagnostics", s.exportDiagnostics)
 	s.mux.HandleFunc("GET /api/v1/admin/updates", s.updateStatus)
 	s.mux.HandleFunc("POST /api/v1/admin/updates", s.updateAction)
 	for _, path := range []string{
 		"/api/v1/rooms/{room_id}/chat", "/api/v1/rooms/{room_id}/statistics",
 		"/api/v1/rooms/{room_id}/rankings", "/api/v1/rooms/{room_id}/achievements",
-		"/api/v1/rooms/{room_id}/vip", "/api/v1/rooms/{room_id}/stickers",
+		"/api/v1/rooms/{room_id}/stickers",
 	} {
-		s.mux.HandleFunc(path, s.lockedFeature)
+		s.mux.HandleFunc(path, s.unimplementedFeature)
 	}
 }
 
 func (s *Server) RunClock(ctx context.Context) {
+	roomIDs, err := s.store.ListIdleQueuedRoomIDs(ctx)
+	if err != nil {
+		s.logger.Error("idle queue recovery list failed", "error", err)
+	} else {
+		for _, roomID := range roomIDs {
+			state, changed, primeErr := s.store.PrimePlaybackIfIdle(ctx, roomID, "__recovery__")
+			if primeErr != nil {
+				s.logger.Error("idle queue recovery failed", "room_id", roomID, "error", primeErr)
+				continue
+			}
+			if changed {
+				s.logger.Info("idle queue promoted to current playback", "room_id", roomID, "revision", state.Revision)
+				s.hub.Broadcast(roomID, domain.Event{Type: "playback", Revision: state.Revision, Payload: state})
+				if queue, queueErr := s.store.ListQueue(ctx, roomID); queueErr == nil {
+					s.hub.Broadcast(roomID, domain.Event{Type: "queue", Payload: queue})
+				}
+			}
+		}
+	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -313,6 +336,13 @@ func (s *Server) originAllowed(r *http.Request) bool {
 	if origin == "" {
 		return true
 	}
+	if parsed, err := url.Parse(origin); err == nil {
+		for _, sameOriginService := range []*url.URL{s.config.NavidromePublic, s.config.GatewayPublic} {
+			if sameOriginService != nil && strings.EqualFold(parsed.Scheme, sameOriginService.Scheme) && strings.EqualFold(parsed.Host, sameOriginService.Host) {
+				return true
+			}
+		}
+	}
 	for _, allowed := range s.config.AllowedOrigins {
 		if allowed == origin {
 			return true
@@ -354,34 +384,28 @@ func (s *Server) discovery(w http.ResponseWriter, _ *http.Request) {
 func featureFromPath(path string) string {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 0 {
-		return "commercial"
+		return "unknown"
 	}
 	return parts[len(parts)-1]
 }
 
-func (s *Server) lockedFeature(w http.ResponseWriter, r *http.Request) {
+func (s *Server) unimplementedFeature(w http.ResponseWriter, r *http.Request) {
 	if _, _, err := s.session(r); err != nil {
 		writeError(w, err)
 		return
 	}
-	writeError(w, domain.FeatureLocked(featureFromPath(r.URL.Path)))
+	writeError(w, domain.FeatureNotImplemented(featureFromPath(r.URL.Path)))
 }
 
-func (s *Server) joinLanding(w http.ResponseWriter, r *http.Request) {
+func (s *Server) redirectRoomUI(w http.ResponseWriter, r *http.Request) {
 	roomID := r.PathValue("room_id")
 	if domain.ValidateID(roomID) != nil {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'")
 	w.Header().Set("Cache-Control", "no-store")
-	bootstrap, err := json.Marshal(map[string]string{
-		"room": roomID, "server": s.config.NavidromePublic.String(), "gateway": s.config.GatewayPublic.String(),
-	})
-	if err != nil {
-		http.Error(w, "Unable to render invitation", http.StatusInternalServerError)
-		return
-	}
-	_, _ = fmt.Fprintf(w, `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Open Music Room</title><style>body{font:16px system-ui;background:#111827;color:#f9fafb;display:grid;place-items:center;min-height:100vh;margin:0}.card{max-width:34rem;padding:2rem;border:1px solid #374151;border-radius:1rem;background:#1f2937}a{display:inline-block;margin-top:1rem;padding:.75rem 1rem;border-radius:.6rem;background:#7c3aed;color:white;text-decoration:none}code{overflow-wrap:anywhere}</style><main class="card"><h1>Navidrome Music Room</h1><p>This invitation opens in MusicMate. The invitation secret remains in your browser fragment and is never sent to this web server.</p><p><code id="room"></code></p><a id="open" href="#">Open MusicMate</a></main><script>(()=>{const config=%s,invite=new URLSearchParams(location.hash.slice(1)).get('invite')||'';document.querySelector('#room').textContent='Room '+config.room;const q=new URLSearchParams({server:config.server,gateway:config.gateway,room:config.room,invite});document.querySelector('#open').href='musicmate://join?'+q.toString()})()</script></html>`, bootstrap)
+	// A relative Location retains reverse-proxy prefixes such as /music-room and
+	// browsers carry the invitation fragment across the redirect.
+	w.Header().Set("Location", roomID+"/")
+	w.WriteHeader(http.StatusPermanentRedirect)
 }

@@ -3,6 +3,7 @@ set -eu
 
 arch=${1:?usage: package-release.sh amd64|arm64 VERSION}
 version=${2:?usage: package-release.sh amd64|arm64 VERSION}
+version=${version#v}
 case "$arch" in
   amd64|arm64) ;;
   *) echo "unsupported architecture: $arch" >&2; exit 1 ;;
@@ -25,7 +26,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -buildvcs=false -trimpath -ldfl
 cp "$dist_dir/navidrome-music-room.ndp" "$stage_dir/navidrome-music-room.ndp"
 cp "$cosign_binary" "$stage_dir/cosign"
 cp "$trusted_root" "$stage_dir/sigstore-trusted-root.json"
-sed "s/0.1.0-dev/$version/" "$root_dir/release.json" > "$stage_dir/release.json"
+sed "s/1.1.0-dev/$version/" "$root_dir/release.json" > "$stage_dir/release.json"
 chmod 0755 "$stage_dir/music-room-gateway" "$stage_dir/music-room-launcher" "$stage_dir/cosign"
 chmod 0644 "$stage_dir/sigstore-trusted-root.json" "$stage_dir/navidrome-music-room.ndp" "$stage_dir/release.json"
 tar -C "$stage_dir" -czf "$dist_dir/navidrome-music-room-linux-$arch.tar.gz" \

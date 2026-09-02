@@ -7,5 +7,5 @@ The event names intentionally preserve the existing FAIO room vocabulary: `snaps
 Contract changes follow semantic versioning. Removing a field or changing its meaning requires a new `/api/v2` namespace.
 
 The fixtures cover the room address, authoritative snapshot, WebSocket events,
-revision conflict, uniform feature lock, offline entitlements, and paired-version
-readiness payloads.
+revision conflicts, planned-feature responses, current capabilities, and
+paired-version readiness payloads.

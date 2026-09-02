@@ -48,7 +48,6 @@ type AuthExchange struct {
 type RoomCapabilities struct {
 	Chat          bool `json:"chat"`
 	Stickers      bool `json:"stickers"`
-	VIP           bool `json:"vip"`
 	Statistics    bool `json:"statistics"`
 	Rankings      bool `json:"rankings"`
 	Achievements  bool `json:"achievements"`

@@ -121,7 +121,7 @@ func (s *Server) addQueueTrack(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	entry, err := s.store.AddQueueEntry(r.Context(), room, domain.QueueEntry{
+	entry, primedPlayback, err := s.store.AddQueueEntry(r.Context(), room, domain.QueueEntry{
 		QueueID: queueID, RoomID: room.RoomID, Track: track,
 		Contributor: session.User.Username, ContributorName: session.User.DisplayName,
 	})
@@ -129,11 +129,20 @@ func (s *Server) addQueueTrack(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	if primedPlayback != nil {
+		s.hub.Broadcast(room.RoomID, domain.Event{
+			Type: "playback", Revision: primedPlayback.Revision, Payload: *primedPlayback,
+		})
+	}
 	queue, err := s.store.ListQueue(r.Context(), room.RoomID)
 	if err == nil {
 		s.hub.Broadcast(room.RoomID, domain.Event{Type: "queue", Payload: queue})
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"entry": entry, "queue": queue})
+	response := map[string]any{"entry": entry, "queue": queue}
+	if primedPlayback != nil {
+		response["playback"] = *primedPlayback
+	}
+	writeJSON(w, http.StatusCreated, response)
 }
 
 func (s *Server) removeQueueEntry(w http.ResponseWriter, r *http.Request) {

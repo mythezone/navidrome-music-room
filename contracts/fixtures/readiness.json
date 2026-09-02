@@ -2,6 +2,6 @@
   "status": "ready",
   "database": "ready",
   "plugin": "paired",
-  "version": "v1.0.0",
-  "pluginVersion": "v1.0.0"
+  "version": "v1.1.0-dev",
+  "pluginVersion": "v1.1.0-dev"
 }

@@ -1,7 +1,7 @@
 {
-  "license": {
-    "state": "not_installed",
-    "offlineVerification": true
+  "project": {
+    "openSource": true,
+    "spdxLicense": "GPL-3.0-only"
   },
   "features": {
     "rooms": true,
@@ -12,7 +12,6 @@
     "history": true,
     "chat": false,
     "stickers": false,
-    "vip": false,
     "statistics": false,
     "rankings": false,
     "achievements": false,

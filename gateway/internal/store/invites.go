@@ -48,7 +48,7 @@ FROM invites WHERE room_id = ? ORDER BY created_unix_ms DESC`, roomID)
 		return nil, err
 	}
 	defer rows.Close()
-	var result []domain.Invite
+	result := make([]domain.Invite, 0)
 	for rows.Next() {
 		invite, err := scanInvite(rows)
 		if err != nil {

@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "feature_not_implemented",
+    "message": "This open-source roadmap feature is not implemented yet",
+    "details": {
+      "featureKey": "chat"
+    }
+  }
+}

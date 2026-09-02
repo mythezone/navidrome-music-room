@@ -1,9 +1,9 @@
 {
   "name": "Navidrome Music Room",
   "author": "MusicMate Contributors",
-  "version": "0.1.0-dev",
-  "description": "Authorizes Navidrome users and connects MusicMate listening rooms to the local companion gateway.",
-  "website": "https://github.com/mythezone/navidrome-music-room",
+  "version": "1.1.0-dev",
+  "description": "Create, share and join synchronized Web or MusicMate listening rooms. Open Website below to manage rooms and QR codes.",
+  "website": "/music-room/admin/",
   "config": {
     "schema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -52,12 +52,6 @@
           "title": "Update channel",
           "enum": ["stable", "beta"],
           "default": "stable"
-        },
-        "license_file": {
-          "type": "string",
-          "title": "Optional License file",
-          "description": "Path relative to the gateway room-data directory (for example secrets/license.json). The gateway verifies its Ed25519 signature offline; commercial implementations remain absent from this release.",
-          "default": ""
         }
       },
       "required": [
@@ -90,13 +84,7 @@
             { "type": "Control", "scope": "#/properties/pairing_token", "options": { "format": "password" } }
           ]
         },
-        {
-          "type": "HorizontalLayout",
-          "elements": [
-            { "type": "Control", "scope": "#/properties/update_channel" },
-            { "type": "Control", "scope": "#/properties/license_file" }
-          ]
-        }
+        { "type": "Control", "scope": "#/properties/update_channel" }
       ]
     }
   },

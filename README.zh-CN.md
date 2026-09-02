@@ -1,95 +1,211 @@
-# Navidrome Music Room
+<p align="center">
+  <img src="docs/assets/logo.png" width="148" alt="Navidrome Music Room 标志" />
+</p>
 
-[English](README.md)
+<h1 align="center">Navidrome Music Room</h1>
 
-> 当前状态：开发预览版。网关、`.ndp` 桥接、签名更新器、API 合同和 MusicMate 第一阶段兼容层已经建立，但在公开到互联网之前仍应完整阅读安全文档并完成 Beta 验收。
+<p align="center"><strong>把自己的 Navidrome 曲库变成私密、同步的一起听歌房。</strong></p>
 
-Navidrome Music Room 把自托管 Navidrome 曲库变成 MusicMate 的同步听歌房。管理员创建房间并分享链接或二维码，受邀的 Navidrome 用户使用自己的账号加入；音频、封面和歌词始终由客户端直接向 Navidrome 请求，不经过房间网关代理。
+<p align="center">
+  <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev"><img alt="版本" src="https://img.shields.io/badge/version-v1.1.0--dev-ff6b57"></a>
+  <a href="https://github.com/mythezone/navidrome-music-room/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/mythezone/navidrome-music-room?include_prereleases&sort=semver"></a>
+  <a href="https://github.com/mythezone/navidrome-music-room/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/mythezone/navidrome-music-room/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/mythezone/navidrome-music-room/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/mythezone/navidrome-music-room/actions/workflows/codeql.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
+  <a href="https://www.navidrome.org/"><img alt="Navidrome 0.63.2+" src="https://img.shields.io/badge/Navidrome-0.63.2%2B-00a4dc"></a>
+  <a href="https://opensubsonic.netlify.app/"><img alt="OpenSubsonic" src="https://img.shields.io/badge/API-OpenSubsonic-6e56cf"></a>
+  <img alt="Docker Compose" src="https://img.shields.io/badge/install-Docker%20Compose-2496ed">
+  <img alt="Linux amd64 arm64" src="https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-fcc624">
+  <a href="CONTRIBUTING.md"><img alt="欢迎 PR" src="https://img.shields.io/badge/PRs-welcome-brightgreen"></a>
+</p>
 
-![MusicMate 房间界面预览](docs/assets/musicmate-demo.gif)
+<p align="center"><a href="README.md">English</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">下载</a> · <a href="#快速安装">安装</a> · <a href="#使用听歌房">使用</a></p>
 
-预览沿用现有 MusicMate 房间结构。聊天、贴纸、VIP、统计、排行榜和成就入口保留但处于 License 锁定状态。
+![桌面与手机上的 Navidrome Music Room](docs/assets/hero.png)
 
-## 为什么需要伴生网关
+管理员从 Navidrome 插件页面创建房间并分享链接或二维码，受邀用户使用自己的 Navidrome 账号，直接在桌面或手机浏览器里一起听歌。音频由 Navidrome 直接提供，房间服务负责同步播放、暂停、进度、切歌、待播列表与断线重连。
 
-Navidrome v0.63.2 的 `.ndp` 是沙箱化 WebAssembly 插件，目前没有自定义 Web 页面、入站 HTTP/WebSocket 路由或播放器控制扩展点，也不能自行监听端口。因此本项目采用官方 `.ndp` 加本地 Go 网关：
+当前预览版本：**v1.1.0-dev**。这一版补齐了点歌台的 **歌曲 / 专辑 / 歌手** 三种浏览方式，以及整张专辑点播。
 
-```text
-Navidrome 插件设置与用户授权
-          │
-          ▼
-navidrome-music-room.ndp ──30 秒用户/管理员心跳──▶ 本地房间网关
-                                                        ▲
-                           MusicMate REST/WebSocket ─────┘
-                           音频/封面/歌词 ───────────────▶ Navidrome
-```
+## 适合这些场景
 
-Navidrome Web 首版只负责安装、配置、授权和启停，完整房间体验在 MusicMate。详见[官方插件文档](https://www.navidrome.org/docs/usage/features/plugins/)和[架构说明](docs/ARCHITECTURE.md)。
+- 异地朋友一起听同一张专辑，所有人的播放位置保持一致。
+- 家庭成员共用自建曲库，但每个人仍使用自己的账号和曲库权限。
+- 聚会、工作室或小团队建立私密房间，成员点歌，房主统一控制播放。
+- 先从 Navidrome 分享听歌房，未来也可使用 MusicMate App 扫描同一个二维码加入。
 
-## 免费与锁定功能
+## 已实现功能
 
-| 功能 | 首版 |
+| 使用体验 | v1.1.0-dev |
 |---|---|
-| 房间 CRUD、关闭/重开 | 免费 |
-| 可撤销邀请、持久成员、成员移除 | 免费 |
-| 在线状态、同步播放、队列、历史 | 免费 |
-| Navidrome 搜索、收藏、歌单、封面、歌词、转码、音频流 | 复用每个用户自己的 OpenSubsonic 权限 |
-| 分享链接、Deep Link、App 本地二维码 | 免费 |
-| 聊天、贴纸、VIP、统计、排行、等级、成就 | `402 feature_locked` |
-| 上传、第三方在线源、语音点歌、公共输出设备 | 暂不迁移 |
+| 创建、修改、关闭、重开和删除房间 | ✅ |
+| 分享 HTTPS 邀请、MusicMate Deep Link 和本地二维码 | ✅ |
+| 邀请兑换、持久成员和成员移除 | ✅ |
+| 桌面与手机浏览器直接播放 | ✅ |
+| 同步播放、暂停、进度、切歌和刷新重连 | ✅ |
+| 按歌曲、专辑、歌手浏览并点播 | ✅ |
+| 整张专辑加入待播 | ✅ |
+| 搜索、收藏、歌单、封面和歌词 | ✅ |
+| 每个用户按自己的权限直连 Navidrome 音频 | ✅ |
+| 群聊、更丰富的房间动态和社区统计 | 开源路线图 |
 
-## Docker Compose 快速安装
+通过 Navidrome 插件详情中的 **Website** 打开管理页：
 
-准备 Linux amd64/arm64、Docker Compose v2、两个 HTTPS 域名，以及 Navidrome 与网关都可写的插件目录。
+![从 Navidrome 打开的听歌房管理页](docs/assets/admin-ui-live.png)
+
+管理页可在浏览器本地生成邀请链接和二维码：
+
+![分享链接与二维码](docs/assets/share-dialog-live.png)
+
+同一个邀请可以直接打开完整 Web 听歌房：
+
+![桌面 Web 听歌房](docs/assets/web-room-live.png)
+
+歌曲、专辑和歌手页面现在直接复用 Navidrome 的 OpenSubsonic 曲库接口：
+
+![点歌台中的歌曲、专辑与歌手](docs/assets/web-room-catalog-live.png)
+
+<img src="docs/assets/web-room-mobile.png" width="390" alt="手机 Web 听歌房" />
+
+## 下载
+
+[v1.1.0-dev Release](https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev) 会直接提供无需编译的安装文件：
+
+| 文件 | 用途 |
+|---|---|
+| [`navidrome-music-room-compose-1.1.0-dev.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-compose-1.1.0-dev.tar.gz) | 推荐；可直接启动的 Navidrome + 网关 Compose 安装包 |
+| [`navidrome-music-room.ndp`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room.ndp) | 给现有 Navidrome 使用的插件包 |
+| [`navidrome-music-room-linux-amd64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-linux-amd64.tar.gz) | Linux x86-64 网关与 launcher |
+| [`navidrome-music-room-linux-arm64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-linux-arm64.tar.gz) | Linux ARM64 网关与 launcher |
+
+同一 Release 还包含校验和、SPDX SBOM、来源证明与 Sigstore 验证文件。
+
+## 快速安装
+
+需要 Linux amd64/arm64、Docker Engine、Docker Compose v2，以及可写的 Navidrome 数据、音乐和插件目录。
 
 ```bash
-git clone https://github.com/mythezone/navidrome-music-room.git
-cd navidrome-music-room
+curl -LO https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-compose-1.1.0-dev.tar.gz
+tar -xzf navidrome-music-room-compose-1.1.0-dev.tar.gz
+cd navidrome-music-room-1.1.0-dev
 cp .env.example .env
 ```
 
-编辑 `.env`：
+编辑 `.env`。例如在局域网 `192.168.1.20:1970` 测试：
 
 ```dotenv
-NAVIDROME_PUBLIC_URL=https://music.example.com
-MUSIC_ROOM_PUBLIC_URL=https://rooms.example.com
-MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=<至少 32 字符的随机密钥>
+PUID=1000
+PGID=1000
+NAVIDROME_BIND_ADDRESS=0.0.0.0
+NAVIDROME_PORT=1970
+NAVIDROME_PUBLIC_URL=http://192.168.1.20:1970
+MUSIC_ROOM_PUBLIC_URL=http://192.168.1.20:1970/music-room
+MUSIC_ROOM_ALLOWED_ORIGINS=http://192.168.1.20:1970
+MUSIC_LIBRARY_PATH=/srv/music
+NAVIDROME_DATA_PATH=/srv/navidrome/data
+NAVIDROME_PLUGINS_PATH=/srv/navidrome/plugins
+MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=replace-with-at-least-32-random-characters
 ```
 
-当前开发预览默认跟随已签名的 `beta` 容器标签；稳定版发布后默认频道会切换到 `latest`。生产环境建议始终固定具体版本。
+请填写所有听众实际访问的 IP 或域名。局域网测试可使用 HTTP；暴露到公网前应使用同一个 HTTPS 域名。
 
 启动：
 
 ```bash
-mkdir -p data/navidrome data/plugins/navidrome-music-room/room-data music
-chown -R 1000:1000 data
-docker compose up -d
+./install.sh "$PWD"
+docker compose ps
 ```
 
-也可以使用 `deploy/compose/install.sh` 创建目录和随机配对密钥。随后在 Navidrome 的 **设置 → 插件** 中打开 Navidrome Music Room，填写内外部地址和配对密钥，明确选择插件可访问的用户，再启用插件。
+如果没有配置配对密钥，安装脚本会自动生成。网关 launcher 会把 `navidrome-music-room.ndp` 自动复制到共享插件目录。打开 `http://192.168.1.20:1970`，创建第一个 Navidrome 管理员，并等待音乐扫描完成。
 
-两个服务都应置于 TLS 反向代理之后；[Nginx 示例](deploy/nginx.conf.example)已经包含 WebSocket 转发。不要把明文 HTTP 网关暴露到公网。
+### 使用已有的 Navidrome 曲库
 
-## 权限与邀请流程
+先备份 Navidrome，停止原来的容器，然后让 Release 安装包继续使用原目录：
 
-1. App 在本地生成 OpenSubsonic salt 和 `md5(password + salt)`；原始密码只留在 Keychain/Credential Store。
-2. 网关只校验自己配置的 Navidrome 地址，不接受客户端传入上游 URL。
-3. 创建房间必须同时满足 Navidrome `adminRole=true` 和插件用户授权。
-4. 普通用户先兑换邀请；成功后成为持久成员，之后登录即可直接重进。
-5. 邀请默认 7 天、20 次，可设置单次、期限和次数，也可撤销。数据库只保存 256 位随机密钥的 SHA-256。
-6. 邀请被撤销不会移除已加入成员；管理员可以单独移除成员并立即断开其房间 WebSocket。
-7. 用户加入和点歌时都会检查 music folder 权限，绝不会借用房主账号绕过 Navidrome ACL。
+```dotenv
+NAVIDROME_DATA_PATH=/现有/navidrome-data
+MUSIC_LIBRARY_PATH=/现有/music
+NAVIDROME_PLUGINS_PATH=/现有/navidrome-plugins
+```
 
-分享链接把邀请放在 fragment 中，避免进入代理日志和 Referer：
+Compose 会把它们分别挂载为 `/data`、`/music` 和 `/plugins`，不会导入或改写 Navidrome 数据库。房间数据会独立保存在：
 
 ```text
-https://rooms.example.com/join/ROOM_ID#invite=SECRET
-musicmate://join?server=...&gateway=...&room=...&invite=...
+/现有/navidrome-plugins/navidrome-music-room/room-data/
 ```
 
-## 数据与隐私
+如果要接入自己维护的 Compose，请从 Release 包复制 `music-room-gateway` 服务和 `/music-room/` 反向代理规则，并为 Navidrome 增加：
 
-房间数据完全独立于 Navidrome 数据表：
+```yaml
+environment:
+  ND_PLUGINS_ENABLED: "true"
+  ND_PLUGINS_FOLDER: /plugins
+  ND_PLUGINS_AUTORELOAD: "true"
+volumes:
+  - /现有/navidrome-plugins:/plugins
+```
+
+`.ndp` 本身不能监听浏览器和 WebSocket 请求，因此仍需要同机网关；推荐直接使用 Compose 安装包。
+
+## 在 Navidrome 中配置插件
+
+1. 打开 **设置 → 插件 → Navidrome Music Room**。
+2. Compose 安装把 **Navidrome 内部地址** 设为 `http://navidrome:4533`。
+3. **Navidrome 外部地址** 填听众使用的地址，例如 `https://music.example.com`。
+4. **网关内部地址** 填 `http://music-room-gateway:4534`。
+5. **网关外部地址** 填 `https://music.example.com/music-room`。
+6. 粘贴 `install.sh` 输出或 `.env` 中的配对密钥。
+7. 选择允许使用听歌房的 Navidrome 用户，保存并启用插件。
+8. 等待最多 30 秒，然后点击插件的 **Website** 打开房间管理页。
+
+网关与 Navidrome 最好使用同一个公开来源：Navidrome 在 `/`，房间在 `/music-room/`。这样浏览器可以正常登录和直连音频，不需要放宽跨域凭据规则。
+
+## 使用听歌房
+
+### 创建和分享
+
+1. 以管理员身份登录 Navidrome。
+2. 打开 Music Room 插件，点击 **Website**。
+3. 创建房间，选择允许使用的音乐库并保存。
+4. 创建邀请，选择复制链接、二维码或 MusicMate 链接。
+5. 对方打开链接，使用自己的 Navidrome 账号登录并兑换邀请。
+
+### 按歌曲、专辑和歌手点歌
+
+在房间内打开 **点歌台**，即可切换三种选歌方式：
+
+- **歌曲**：从 Navidrome 读取可用歌曲，点击即可点播。
+- **专辑**：显示最新专辑；进入专辑后逐首选择，或点击 **整张点播**。
+- **歌手**：使用 Navidrome 的歌手索引，再进入该歌手的专辑和歌曲。
+- **搜索**：同时返回歌曲、专辑和歌手，仍可用上面的三个标签切换。
+
+这些页面直接使用标准 OpenSubsonic 方法（`getRandomSongs`、`getAlbumList2`、`getArtists`、`getArtist`、`getAlbum`、`search3`）。听歌房只把 Navidrome 曲目 ID 加入共同队列，不重复维护或抓取 Navidrome 数据库。
+
+### 同步收听
+
+受浏览器自动播放规则限制，每个浏览器首次进入时需要点击一次 **开始收听**。之后由房主或 Navidrome 管理员控制全房间播放、暂停、进度和切歌；各客户端根据网关的权威时间计算位置、修复漂移、预载下一首，并在刷新或断网后恢复最新快照。
+
+## 能否在 Navidrome 原生歌曲或专辑页添加按钮？
+
+Navidrome v0.63.2 的官方 `.ndp` API 暂时做不到。当前插件 manifest 可以提供配置和 Website 链接，但没有歌曲/专辑上下文操作、自定义路由、左侧栏或播放器控制扩展点。现在强行加入原生“点播到房间”按钮，只能修改 Navidrome 前端或注入浏览器脚本，后续升级会很脆弱。
+
+本项目继续兼容原版 Navidrome：在内嵌听歌房里复用同一套 OpenSubsonic 查询，自己提供歌曲、专辑、歌手入口。以后官方加入资源操作扩展点时，可以直接补原生按钮，而无需修改房间协议。参见 [Navidrome 官方插件文档](https://www.navidrome.org/docs/usage/features/plugins/)。
+
+## 账号、权限与隐私
+
+- 不允许匿名加入；每位听众都必须是插件授权的 Navidrome 用户。
+- 只有 Navidrome 管理员能创建房间；房主和管理员管理全局播放与成员。
+- 邀请密钥随机生成，SQLite 只保存 SHA-256 摘要。
+- 加入和点歌都会检查 music folder 权限，不会借用房主权限。
+- 密码只发送到同源 Navidrome 登录接口；网关拿到的是短期 OpenSubsonic 证明，不是原始密码。
+- 音频、封面和歌词由各客户端直接请求 Navidrome，房间网关不代理媒体正文。
+- 默认不发送遥测。
+
+公网部署前请阅读 [SECURITY.md](SECURITY.md)。
+
+## 数据、备份与卸载
+
+所有房间数据都在 Navidrome 数据库之外：
 
 ```text
 ${Plugins.Folder}/navidrome-music-room/room-data/
@@ -100,29 +216,45 @@ ${Plugins.Folder}/navidrome-music-room/room-data/
 └── logs/
 ```
 
-SQLite 开启 WAL、外键和事务迁移；每次迁移与版本切换前生成一致性备份。敏感文件权限为 `0600`，目录为 `0700`。默认不发送遥测；管理员可在 MusicMate 中主动生成自动脱敏的 JSON 诊断包，内容仅包含汇总健康信息。卸载插件或容器不会删除 `room-data`，只有显式清理才会移除。
+请把这个目录与 Navidrome 一起备份。删除容器或 `.ndp` 默认保留房间数据；只有确定永久卸载时，停止网关并精确删除这个目录。
 
-## 更新与回滚
+## 更新与排错
 
-管理员 API 支持检查、暂存、安装和回滚。更新器只读取 GitHub Releases，不执行 `git pull`；下载后先验证已签名的校验清单与 SHA-256，并使用当前已验证版本内置的 Cosign 与固定 Sigstore trusted root，在不访问 Sigstore 网络服务、也不依赖可写 HOME 的条件下校验归档、SPDX SBOM 与绑定归档摘要/仓库/Tag/工作流的 in-toto/SLSA 来源证明签名，再检查归档路径和必需文件。稳定 launcher 会在激活前复核网关、Cosign、trusted root、`.ndp` 和元数据摘要，备份数据库并原子切换；健康检查失败会恢复整套旧版本和旧数据库备份。
+在管理员控制台点击 **检查更新 → 立即升级**。签名更新器会下载与架构匹配的 Release 包；Launcher 先备份房间数据，再同时切换网关与 `.ndp`，健康检查失败时自动恢复上一版。手动或离线升级请按[更新文档](docs/UPDATES.md)操作，不要只替换 `.ndp`。
 
-只有当上一版二进制、插件和升级前 SQLite 备份能被验证为同一次切换时，管理页才会启用“回滚”。手动回滚会同时恢复这三项，并保留向前恢复点，直到旧网关通过健康检查。
+- **插件列表里没有插件：**确认 `ND_PLUGINS_ENABLED=true`、`/plugins` 挂载正确，并且目录中存在 `navidrome-music-room.ndp`，然后重新扫描插件。
+- **插件租约过期：**检查网关内部地址、配对密钥、启用状态和用户授权，等待一个心跳周期。
+- **看不到歌曲或专辑：**升级到 v1.1.0-dev，确认房间 music folder 权限，然后重新打开点歌台。
+- **浏览器没有声音：**先点击一次 **开始收听**，再检查浏览器对 Navidrome `stream` 的直连请求。
+- **WebSocket 断开：**检查反向代理是否为 `/music-room/` 转发 `Upgrade` 与 `Connection`。
 
-GPL 核心不包含可被客户端绕过的商业功能实现，只提供完全离线的 Ed25519 License 验证边界；签名声明不能解锁并未随核心发布的代码，格式见 [License 文件说明](docs/LICENSE_FILES.md)。
+更多说明：[兼容版本](docs/COMPATIBILITY.md)、[更新](docs/UPDATES.md)、[MusicMate 对接](docs/MUSICMATE_INTEGRATION.md)和 [API 协议](contracts/openapi.yaml)。
 
-Navidrome 检测到 `.ndp` 变化后会禁用插件。MusicMate 管理员页面已经实现一键续接：JWT 只保存在本次流程内存中，经 v0.63.2 版本适配器完成 rescan/enable，并同时确认网关版本和插件版本心跳。详见 [UPDATES.md](docs/UPDATES.md)。
+## MusicMate App 预告
 
-## 兼容与开发
+MusicMate 是接下来发布的 iOS / Android 原生客户端。它会扫描同一个房间二维码，把 Navidrome 凭据保存在系统凭据存储中，以 Navidrome 作为音源，并与 Web 用户加入同一个同步待播队列。没有 App 时，Web 听歌房仍然可以完整使用。
 
-- Navidrome 最低版本：v0.63.2；CI 同时覆盖最新稳定版。
-- 服务端：Linux amd64/arm64，首版单实例。
-- FAIO 房间继续由 `FAIORoomProvider` 提供；首版不导入 FAIO 历史数据。
-- API：[`contracts/openapi.yaml`](contracts/openapi.yaml)；兼容 fixtures 位于 `contracts/fixtures/`。
+![MusicMate App 预览](docs/assets/musicmate-demo.gif)
 
-```bash
-make test
-make plugin
-make build
-```
+## 合作方式
 
-常见故障与完整安全说明请阅读英文 README、[SECURITY.md](SECURITY.md)、[安全模型](docs/SECURITY_MODEL.md)和[贡献指南](CONTRIBUTING.md)。社区核心采用 GPL-3.0-only。
+项目完全开源，欢迎代码、翻译、测试、界面建议和不同部署环境的反馈。
+
+- Bug 与功能建议：[GitHub Issues](https://github.com/mythezone/navidrome-music-room/issues)
+- 提交代码：先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- 产品、集成或社区合作：[mythezone@gmail.com](mailto:mythezone@gmail.com)
+- 安全问题：按 [SECURITY.md](SECURITY.md) 使用 GitHub 私密漏洞报告
+
+项目采用 GPL-3.0-only，详见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
+
+## 请我喝杯咖啡
+
+如果 Music Room 对你有帮助，可以请我喝杯咖啡，支持持续测试、发布和完善文档。项目会继续保持开源。
+
+<table>
+  <tr><th>支付宝</th><th>微信支付</th></tr>
+  <tr>
+    <td><img src="docs/assets/donate-alipay.jpg" width="300" alt="支付宝收款码" /></td>
+    <td><img src="docs/assets/donate-wechat.jpg" width="300" alt="微信收款码" /></td>
+  </tr>
+</table>

@@ -1,9 +1,0 @@
-{
-  "error": {
-    "code": "feature_locked",
-    "message": "This feature requires a license",
-    "details": {
-      "featureKey": "chat"
-    }
-  }
-}

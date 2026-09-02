@@ -46,6 +46,13 @@ jobs:
         with:
           go-version: "1.25.x"
           cache-dependency-path: gateway/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: |
+            admin-ui/package-lock.json
+            room-ui/package-lock.json
       - uses: actions/download-artifact@v4
         with:
           name: plugin
@@ -55,6 +62,10 @@ jobs:
           COSIGN_AMD64_IMAGE: ghcr.io/sigstore/cosign/cosign@sha256:bea051df6a6d3bc84288b6db098df38a81d87b7ed226f34d22aaae1bc329c2b7
           COSIGN_ARM64_IMAGE: ghcr.io/sigstore/cosign/cosign@sha256:fb9fae1d016f9edc8f5c850f49416405a15944dc42d0f5ac3bbb8d9f76f889a5
         run: |
+          npm --prefix admin-ui ci
+          npm --prefix admin-ui run build
+          npm --prefix room-ui ci
+          npm --prefix room-ui run build
           case "${{ matrix.arch }}" in
             amd64) cosign_image=$COSIGN_AMD64_IMAGE ;;
             arm64) cosign_image=$COSIGN_ARM64_IMAGE ;;
@@ -94,11 +105,13 @@ jobs:
         with:
           cosign-release: v3.1.2
       - uses: anchore/sbom-action/download-syft@v0.20.6
+      - name: Package ready-to-run Docker Compose kit
+        run: ./script/package-compose-release.sh "$GITHUB_REF_NAME" release/navidrome-music-room.ndp release
       - name: Checksums, SBOMs, and keyless Sigstore bundles
         working-directory: release
         run: |
-          sha256sum navidrome-music-room-linux-*.tar.gz navidrome-music-room.ndp > checksums.txt
-          for asset in navidrome-music-room-linux-*.tar.gz navidrome-music-room.ndp; do
+          sha256sum navidrome-music-room-linux-*.tar.gz navidrome-music-room-compose-*.tar.gz navidrome-music-room.ndp > checksums.txt
+          for asset in navidrome-music-room-linux-*.tar.gz navidrome-music-room-compose-*.tar.gz navidrome-music-room.ndp; do
             syft "$asset" -o spdx-json="${asset}.spdx.json"
             digest=$(sha256sum "$asset" | cut -d' ' -f1)
             jq -n \

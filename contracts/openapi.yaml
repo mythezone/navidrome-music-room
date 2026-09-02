@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Navidrome Music Room Gateway API
-  version: 1.0.0
+  version: 1.1.0-dev
   license:
     name: GPL-3.0-only
     identifier: GPL-3.0-only
@@ -9,7 +9,7 @@ info:
     Versioned room coordination API for MusicMate. Media bytes never pass through this API;
     clients stream audio, artwork, and lyrics directly from Navidrome with their own credentials.
 servers:
-  - url: https://rooms.example.com/api/v1
+  - url: https://music.example.com/music-room/api/v1
 security:
   - roomSession: []
 tags:
@@ -17,7 +17,7 @@ tags:
   - name: Rooms
   - name: Invitations
   - name: Playback
-  - name: Entitlements
+  - name: Capabilities
   - name: Updates
 paths:
   /discovery:
@@ -356,7 +356,11 @@ paths:
               properties:
                 track: { $ref: '#/components/schemas/TrackRef' }
       responses:
-        '201': { description: Queue entry created }
+        '201':
+          description: Queue entry accepted; `playback` is present when the first pending track became the paused current track
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QueueMutation' }
         '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/queue/{queue_id}:
@@ -428,21 +432,21 @@ paths:
       responses:
         '101': { description: WebSocket upgraded }
         '401': { $ref: '#/components/responses/Error' }
-  /entitlements:
+  /capabilities:
     get:
-      tags: [Entitlements]
-      summary: Return free and locked capabilities
+      tags: [Capabilities]
+      summary: Return the current open-source feature availability
       responses:
         '200':
-          description: Offline License state and effective capabilities. Signed claims never enable code absent from the core.
+          description: Project metadata and the capabilities implemented by this release.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Entitlements' }
+              schema: { $ref: '#/components/schemas/FeatureAvailability' }
   /admin/diagnostics:
     get:
       tags: [Updates]
       summary: Explicitly export an automatically redacted diagnostic bundle
-      description: Returns aggregate runtime, plugin heartbeat, update, License, and database health only; no URLs, names, room identifiers, invitations, credentials, or row data are included.
+      description: Returns aggregate runtime, plugin heartbeat, update, and database health only; no URLs, names, room identifiers, invitations, credentials, or row data are included.
       responses:
         '200':
           description: Private JSON attachment generated on demand
@@ -453,20 +457,20 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DiagnosticBundle' }
         '403': { $ref: '#/components/responses/Error' }
-  /rooms/{room_id}/{locked_feature}:
+  /rooms/{room_id}/{unimplemented_feature}:
     get:
-      tags: [Entitlements]
-      summary: Reserved commercial feature surface
-      description: The community core ships no implementation and always returns the uniform lock envelope.
+      tags: [Capabilities]
+      summary: Return a uniform response for planned features
+      description: These open-source roadmap endpoints are not implemented in this release.
       parameters:
         - $ref: '#/components/parameters/RoomID'
-        - name: locked_feature
+        - name: unimplemented_feature
           in: path
           required: true
-          schema: { type: string, enum: [chat, stickers, vip, statistics, rankings, achievements] }
+          schema: { type: string, enum: [chat, stickers, statistics, rankings, achievements] }
       responses:
-        '402':
-          description: Feature is License-locked and absent from the community core
+        '501':
+          description: Feature is not implemented in this release
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
@@ -607,11 +611,10 @@ components:
         preloadNextTrack: { type: boolean }
     Capabilities:
       type: object
-      required: [chat, stickers, vip, statistics, rankings, achievements, uploads, onlineSources, invites, queue, history]
+      required: [chat, stickers, statistics, rankings, achievements, uploads, onlineSources, invites, queue, history]
       properties:
         chat: { type: boolean, const: false }
         stickers: { type: boolean, const: false }
-        vip: { type: boolean, const: false }
         statistics: { type: boolean, const: false }
         rankings: { type: boolean, const: false }
         achievements: { type: boolean, const: false }
@@ -695,6 +698,18 @@ components:
         contributorUsername: { type: string }
         contributorDisplayName: { type: string }
         createdAt: { type: string, format: date-time }
+    QueueMutation:
+      type: object
+      required: [entry, queue]
+      properties:
+        entry: { $ref: '#/components/schemas/QueueEntry' }
+        queue:
+          type: array
+          items: { $ref: '#/components/schemas/QueueEntry' }
+        playback:
+          description: Paused authoritative state emitted when an idle room is primed by this request.
+          allOf:
+            - { $ref: '#/components/schemas/Playback' }
     Playback:
       type: object
       required: [revision, serverTime, status, pausedForEmpty, positionSeconds]
@@ -724,34 +739,22 @@ components:
         playback: { $ref: '#/components/schemas/Playback' }
         history: { type: array, items: { type: object } }
         generatedAt: { type: string, format: date-time }
-    LicenseStatus:
+    FeatureAvailability:
       type: object
       additionalProperties: false
-      required: [state, offlineVerification]
+      required: [project, features]
       properties:
-        state:
-          type: string
-          enum: [not_installed, verification_unavailable, invalid, not_yet_valid, expired, valid]
-        offlineVerification: { type: boolean, const: true }
-        licenseID: { type: string }
-        subject: { type: string }
-        expiresAt: { type: string, format: date-time }
-        grantedFeatures:
-          type: array
-          uniqueItems: true
-          description: Cryptographically granted claims; effective features remain false until a separately shipped implementation is present.
-          items: { type: string, enum: [chat, stickers, vip, statistics, rankings, achievements] }
-        reason: { type: string }
-    Entitlements:
-      type: object
-      additionalProperties: false
-      required: [license, features]
-      properties:
-        license: { $ref: '#/components/schemas/LicenseStatus' }
+        project:
+          type: object
+          additionalProperties: false
+          required: [openSource, spdxLicense]
+          properties:
+            openSource: { type: boolean, const: true }
+            spdxLicense: { type: string, const: GPL-3.0-only }
         features:
           type: object
           additionalProperties: false
-          required: [rooms, invites, presence, synchronizedPlayback, queue, history, chat, stickers, vip, statistics, rankings, achievements, uploads, onlineSources]
+          required: [rooms, invites, presence, synchronizedPlayback, queue, history, chat, stickers, statistics, rankings, achievements, uploads, onlineSources]
           properties:
             rooms: { type: boolean }
             invites: { type: boolean }
@@ -761,7 +764,6 @@ components:
             history: { type: boolean }
             chat: { type: boolean }
             stickers: { type: boolean }
-            vip: { type: boolean }
             statistics: { type: boolean }
             rankings: { type: boolean }
             achievements: { type: boolean }
@@ -770,7 +772,7 @@ components:
     DiagnosticBundle:
       type: object
       additionalProperties: false
-      required: [format, generatedAt, redacted, gateway, configuration, plugin, database, license, update]
+      required: [format, generatedAt, redacted, gateway, configuration, plugin, database, update]
       properties:
         format: { type: string, const: navidrome-music-room-diagnostics/v1 }
         generatedAt: { type: string, format: date-time }
@@ -790,7 +792,6 @@ components:
             tableCounts:
               type: object
               additionalProperties: { type: integer, minimum: 0 }
-        license: { type: object, additionalProperties: true }
         update: { type: object, additionalProperties: true }
     UpdateStatus:
       type: object

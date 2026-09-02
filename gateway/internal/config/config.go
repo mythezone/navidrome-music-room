@@ -31,7 +31,6 @@ type Config struct {
 	CosignBinary        string
 	SigstoreTrustedRoot string
 	UpdateIdentity      string
-	LicensePublicKey    string
 	ManagedByLauncher   bool
 	PluginLease         time.Duration
 	ExistingGrace       time.Duration
@@ -96,7 +95,6 @@ func Load() (Config, error) {
 		CosignBinary:        envOr("MUSIC_ROOM_COSIGN_BINARY", "cosign"),
 		SigstoreTrustedRoot: envOr("MUSIC_ROOM_SIGSTORE_TRUSTED_ROOT", "/opt/music-room/release/sigstore-trusted-root.json"),
 		UpdateIdentity:      envOr("MUSIC_ROOM_UPDATE_IDENTITY", "https://github\\.com/"+regexp.QuoteMeta(repository)+"/\\.github/workflows/release\\.yml@refs/tags/.*"),
-		LicensePublicKey:    strings.TrimSpace(os.Getenv("MUSIC_ROOM_LICENSE_PUBLIC_KEY")),
 		ManagedByLauncher:   envBool("MUSIC_ROOM_MANAGED_BY_LAUNCHER", false),
 		PluginLease:         envDuration("MUSIC_ROOM_PLUGIN_LEASE", 90*time.Second),
 		ExistingGrace:       envDuration("MUSIC_ROOM_EXISTING_SESSION_GRACE", 60*time.Second),

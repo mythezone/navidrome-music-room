@@ -24,10 +24,10 @@ fi
 puid=${PUID:-$(id -u)}
 pgid=${PGID:-$(id -g)}
 chown -R "$puid:$pgid" "$project_dir/data"
-docker compose --project-directory "$project_dir" up -d
+docker compose --project-directory "$project_dir" up -d --build
 
 echo "Gateway pairing token:"
 docker compose --project-directory "$project_dir" exec -T music-room-gateway \
   sh -c 'test -r /plugins/navidrome-music-room/room-data/secrets/plugin-pairing-token && cat /plugins/navidrome-music-room/room-data/secrets/plugin-pairing-token' 2>/dev/null || \
   awk -F= '/^MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=/{print $2}' "$project_dir/.env"
-echo "Configure and authorize users for navidrome-music-room.ndp in Navidrome, then enable it."
+echo "Configure and authorize users for navidrome-music-room.ndp in Navidrome, enable it, then open its Website link to manage rooms."

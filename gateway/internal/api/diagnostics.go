@@ -50,10 +50,6 @@ func (s *Server) exportDiagnostics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updateStatus := s.updater.Status(r.Context(), channel)
-	licenseState := "not_installed"
-	if state, stateErr := s.store.PluginState(r.Context()); stateErr == nil {
-		licenseState = s.entitlementProvider.Verify(state.LicenseFile).State
-	}
 	bundle := map[string]any{
 		"format":      "navidrome-music-room-diagnostics/v1",
 		"generatedAt": now,
@@ -70,7 +66,6 @@ func (s *Server) exportDiagnostics(w http.ResponseWriter, r *http.Request) {
 		},
 		"plugin":   plugin,
 		"database": database,
-		"license":  map[string]any{"state": licenseState, "offlineVerification": true},
 		"update": map[string]any{
 			"channel": updateStatus.Channel, "currentVersion": updateStatus.CurrentVersion,
 			"latestVersion": updateStatus.LatestVersion, "stagedVersion": updateStatus.StagedVersion,

@@ -12,7 +12,6 @@
     "capabilities": {
       "chat": false,
       "stickers": false,
-      "vip": false,
       "statistics": false,
       "rankings": false,
       "achievements": false,

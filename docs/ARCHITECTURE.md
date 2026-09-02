@@ -6,14 +6,27 @@ The `.ndp` bridge has four Navidrome permissions: `users`, `scheduler`, `http`, 
 
 Navidrome v0.63.2's web application uses React 17, Material UI v4,
 react-admin 3, and Vite; plugin configuration is rendered from JSONForms. The
-host does not expose a supported custom-page or player-control slot, so v1 does
-not inject a parallel web application or a second `<audio>` element. A future
-Navidrome panel will follow that host stack only after an official extension
-point exists.
+host does not expose a supported sidebar/custom-page or player-control slot.
+The plugin therefore publishes the stable `manifest.website` entry
+`/music-room/admin/`. A same-origin Compose edge routes that path to a React
+17/Material UI v4 console embedded in the gateway binary and routes invitations
+below `/music-room/join/{roomID}/` to an embedded Vue 3 room client. No
+Navidrome source patch is used.
+
+Both browser surfaces read the `username`, `subsonic-salt`, and
+`subsonic-token` values
+created by the current Navidrome login and exchanges them for the same
+15-minute in-memory gateway session used by MusicMate. It never receives the
+user's raw password. The room client owns exactly one audio element and controls
+it from the server's revisioned clock. Share QR codes are rendered locally; invite fragments are
+not sent to another QR service.
 
 The gateway owns room coordination only. It stores rooms, persistent membership, invitation digests, queue, playback history, security audit records, migration state, and updater state. It does not store Navidrome passwords, OpenSubsonic proofs, permanent stream URLs, or audio bodies.
 
-MusicMate owns long-term credentials and playback. It uses the user's Navidrome account for `search3`, `getAlbum`, `getSong`, `getCoverArt`, `getLyricsBySongId`, and `stream`.
+The Web room and MusicMate own playback. Both use the listener's Navidrome
+account for `search3`, `getAlbum`, `getSong`, `getCoverArt`,
+`getLyricsBySongId`, and `stream`; MusicMate alone stores a password long-term
+in the platform credential store.
 
 ## Trust flow
 
@@ -52,8 +65,15 @@ SQLite lives below the plugin folder but does not share Navidrome's schema. WAL,
 - `update_state`
 - `schema_migrations`
 
-There are intentionally no chat, statistics, ranking, VIP, or achievement tables in the community v1 schema.
+There are intentionally no chat, statistics, ranking, level, or achievement tables until those open-source roadmap features are implemented.
 
 ## Deployment model
+
+The Compose edge is the only published listener. It forwards `/` to Navidrome
+and strips `/music-room/` before forwarding HTTP and WebSocket traffic to the
+private gateway listener. Consequently Navidrome login storage is same-origin
+with the management console, and a single TLS certificate protects both.
+The edge access-log format intentionally omits query strings because
+OpenSubsonic proofs are query parameters.
 
 v1 supports one gateway process. The launcher supervises that process and owns atomic release switching. Redis, distributed locks, cloud relays, and multi-node consensus are intentionally absent.

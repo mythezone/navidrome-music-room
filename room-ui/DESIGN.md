@@ -1,0 +1,63 @@
+# Music Room Web design contract
+
+The existing FAIO room screen is the product reference. The generated desktop
+concept used during the 1.0 implementation lives at:
+
+`/home/mythezone/.codex/generated_images/01a05b22-59ae-7c73-9e4f-a0719596b70d/exec-a9bb2324-e8b7-4357-849b-8b97eeffce61.png`
+
+The accepted mobile reference is `/tmp/music-room-after-join.png` from the FAIO
+browser suite. Neither bitmap is shipped as application UI.
+
+## Tokens
+
+- Canvas: `#0d0e13`; elevated surface: `#15171e`; active surface: `#1d2028`.
+- Primary text: `#f6f7fb`; secondary text: `#9298a8`; hairline: `#292c35`.
+- Room status: `#63dfd1`; primary action/selection: `#ff647a`.
+- Error: `#ff7889`; warning: `#f6bd60`; success: `#63dfd1`.
+- Radius: 8px controls, 12px panels, 16px artwork; shadows remain restrained.
+- UI typography: system sans stack with explicit sizes for every control.
+
+## Information architecture
+
+- Desktop: compact room bar, left now-playing surface, right tabbed work area.
+- Mobile: compact room bar, one content surface, fixed six-item bottom navigation.
+- Tabs: 播放, 待播放, 历史, 点歌台, 收藏, 群聊. 群聊 is marked as an
+  open-source roadmap item until its implementation lands.
+- The initial browser media gesture is labelled 开始收听. It is not shown once
+  the browser has granted playback.
+- Admin/owner controls affect the room. Member playback controls affect only the
+  local listener, matching the native MusicMate permission model.
+
+## Component inventory
+
+- `RoomLogin`: existing-session reuse and same-origin Navidrome login.
+- `RoomHeader`: room identity, presence, connection, share, and MusicMate escape.
+- `NowPlaying`: artwork, metadata, synchronized timeline, transport, lyrics.
+- `QueuePanel`: pending items, own-item removal, manager reorder.
+- `HistoryPanel`: server playback history.
+- `CatalogPanel`: OpenSubsonic search, albums, songs, artists, and queue actions.
+- `FavoritesPanel`: the signed-in Navidrome user's starred songs and playlists.
+- `ComingSoonPanel`: honest open-source roadmap state with contribution copy.
+
+The screen must not add marketing copy, analytics, unrelated navigation, or a
+second Navidrome shell.
+
+## v1.1 fidelity ledger
+
+Compared after the live browser run against both reference images:
+
+- Desktop keeps the compact header, large left artwork/player, and bordered
+  right work area. The right area defaults to the queue so it is never an empty
+  duplicate of the persistent player.
+- Mobile keeps one player surface, edge-safe spacing, and six fixed bottom
+  destinations. The 390px acceptance viewport has a 390px scroll width.
+- Cyan remains status/synchronization feedback; pink remains selection and
+  transport. Typography, borders, radii, and muted metadata match the reference
+  hierarchy without copying its unrelated FAIO navigation.
+- Intentional differences are the Navidrome room identity, MusicMate escape,
+  explicit browser-autoplay action, and visibly planned community features.
+  These correspond to real provider and permission behavior rather than
+  decoration.
+
+The compared production captures are `docs/assets/web-room-live.png`,
+`docs/assets/web-room-catalog-live.png`, and `docs/assets/web-room-mobile.png`.

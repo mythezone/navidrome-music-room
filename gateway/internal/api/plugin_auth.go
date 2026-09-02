@@ -4,7 +4,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,15 +30,9 @@ func (s *Server) pluginSync(w http.ResponseWriter, r *http.Request) {
 		writeError(w, domain.NewError(400, "plugin_sync_invalid", "Plugin sync payload is invalid"))
 		return
 	}
-	input.LicenseFile = strings.TrimSpace(input.LicenseFile)
-	if input.LicenseFile != "" {
-		clean := filepath.Clean(input.LicenseFile)
-		if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || len(clean) > 256 {
-			writeError(w, domain.NewError(400, "plugin_sync_invalid", "License file must be a relative path inside room-data"))
-			return
-		}
-		input.LicenseFile = filepath.ToSlash(clean)
-	}
+	// Accept an older bridge payload during rolling upgrades while keeping its
+	// retired field empty in existing databases.
+	input.LicenseFile = ""
 	input.UpdateChannel = strings.ToLower(strings.TrimSpace(input.UpdateChannel))
 	if input.UpdateChannel == "" {
 		input.UpdateChannel = "stable"
@@ -134,22 +127,16 @@ func (s *Server) authLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) entitlements(w http.ResponseWriter, r *http.Request) {
+func (s *Server) featureAvailability(w http.ResponseWriter, r *http.Request) {
 	if _, _, err := s.session(r); err != nil {
 		writeError(w, err)
 		return
 	}
-	pluginState, err := s.store.PluginState(r.Context())
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-	licenseStatus := s.entitlementProvider.Verify(pluginState.LicenseFile)
 	writeJSON(w, 200, map[string]any{
-		"license": licenseStatus,
+		"project": map[string]any{"openSource": true, "spdxLicense": "GPL-3.0-only"},
 		"features": map[string]any{
 			"rooms": true, "invites": true, "presence": true, "synchronizedPlayback": true,
-			"queue": true, "history": true, "chat": false, "stickers": false, "vip": false,
+			"queue": true, "history": true, "chat": false, "stickers": false,
 			"statistics": false, "rankings": false, "achievements": false, "uploads": false, "onlineSources": false,
 		},
 	})

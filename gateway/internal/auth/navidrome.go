@@ -16,7 +16,9 @@ import (
 )
 
 var (
-	validSalt  = regexp.MustCompile(`^[A-Fa-f0-9]{8,64}$`)
+	// Navidrome's native web login intentionally generates a three-byte salt,
+	// encoded as six hexadecimal characters (server/auth.go).
+	validSalt  = regexp.MustCompile(`^[A-Fa-f0-9]{6,64}$`)
 	validToken = regexp.MustCompile(`^[A-Fa-f0-9]{32}$`)
 )
 
@@ -82,11 +84,15 @@ func (c *NavidromeClient) Verify(ctx context.Context, proof domain.AuthProof) (d
 	if response.User == nil || !domain.EqualUsername(response.User.Username, proof.Username) {
 		return domain.User{}, domain.NewError(401, "navidrome_auth_failed", "Navidrome did not return the authenticated user")
 	}
+	folders := response.User.Folder
+	if folders == nil {
+		folders = make([]int, 0)
+	}
 	return domain.User{
 		Username:       response.User.Username,
 		DisplayName:    response.User.Username,
 		Admin:          response.User.AdminRole,
-		MusicFolderIDs: response.User.Folder,
+		MusicFolderIDs: folders,
 	}, nil
 }
 

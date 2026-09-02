@@ -38,7 +38,6 @@ type syncPayload struct {
 	NavidromeInternalURL string     `json:"navidromeInternalURL"`
 	NavidromePublicURL   string     `json:"navidromePublicURL"`
 	GatewayPublicURL     string     `json:"gatewayPublicURL"`
-	LicenseFile          string     `json:"licenseFile,omitempty"`
 	UpdateChannel        string     `json:"updateChannel"`
 	Users                []syncUser `json:"users"`
 	SentAt               time.Time  `json:"sentAt"`
@@ -128,7 +127,6 @@ func syncGateway() error {
 			NavidromeInternalURL: strings.TrimRight(navidromeInternalURL, "/"),
 			NavidromePublicURL:   strings.TrimRight(navidromePublicURL, "/"),
 			GatewayPublicURL:     strings.TrimRight(gatewayPublicURL, "/"),
-			LicenseFile:          configOptionalString("license_file"),
 			UpdateChannel:        configDefaultString("update_channel", "stable"),
 			Users:                syncUsers, SentAt: time.Now().UTC(),
 		})

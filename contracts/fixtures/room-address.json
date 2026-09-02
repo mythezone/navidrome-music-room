@@ -1,6 +1,6 @@
 {
   "provider": "navidrome",
-  "gatewayBaseURL": "https://rooms.example.com",
+  "gatewayBaseURL": "https://music.example.com/music-room",
   "navidromeBaseURL": "https://music.example.com",
   "roomID": "7f3b8ed58db14fd689217c177cbca60e"
 }

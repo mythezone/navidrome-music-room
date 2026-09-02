@@ -1,12 +1,30 @@
 name: navidrome-music-room
 
 services:
+  edge:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      navidrome:
+        condition: service_healthy
+      music-room-gateway:
+        condition: service_healthy
+    ports:
+      - "${NAVIDROME_BIND_ADDRESS:-127.0.0.1}:${NAVIDROME_PORT:-4533}:4533"
+    volumes:
+      - ./deploy/edge-nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4533/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   navidrome:
     image: ${NAVIDROME_IMAGE:-deluan/navidrome:latest}
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
-    ports:
-      - "${NAVIDROME_BIND_ADDRESS:-127.0.0.1}:${NAVIDROME_PORT:-4533}:4533"
+    expose:
+      - "4533"
     environment:
       ND_LOGLEVEL: info
       ND_BASEURL: ""
@@ -25,14 +43,18 @@ services:
       retries: 10
 
   music-room-gateway:
-    image: ${MUSIC_ROOM_IMAGE:-ghcr.io/mythezone/navidrome-music-room:beta}
+    image: ${MUSIC_ROOM_IMAGE:-ghcr.io/mythezone/navidrome-music-room:latest}
+    build:
+      context: .
+      args:
+        VERSION: ${MUSIC_ROOM_VERSION:-1.1.0-dev}
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
     depends_on:
       navidrome:
         condition: service_healthy
-    ports:
-      - "${MUSIC_ROOM_BIND_ADDRESS:-127.0.0.1}:${MUSIC_ROOM_PORT:-4534}:4534"
+    expose:
+      - "4534"
     environment:
       MUSIC_ROOM_LISTEN_ADDRESS: :4534
       MUSIC_ROOM_DATA_DIR: /plugins/navidrome-music-room/room-data
@@ -44,9 +66,8 @@ services:
       MUSIC_ROOM_BOOTSTRAP_RELEASE_DIR: /opt/music-room/release
       MUSIC_ROOM_RELEASE_REPOSITORY: mythezone/navidrome-music-room
       MUSIC_ROOM_ALLOWED_ORIGINS: ${MUSIC_ROOM_ALLOWED_ORIGINS:-}
-      MUSIC_ROOM_TRUST_PROXY: ${MUSIC_ROOM_TRUST_PROXY:-false}
-      MUSIC_ROOM_VERSION: ${MUSIC_ROOM_VERSION:-0.1.0-dev}
-      MUSIC_ROOM_LICENSE_PUBLIC_KEY: ${MUSIC_ROOM_LICENSE_PUBLIC_KEY:-}
+      MUSIC_ROOM_TRUST_PROXY: "true"
+      MUSIC_ROOM_VERSION: ${MUSIC_ROOM_VERSION:-1.1.0-dev}
       TZ: ${TZ:-UTC}
     volumes:
       - ${NAVIDROME_PLUGINS_PATH:-./data/plugins}:/plugins

@@ -112,6 +112,10 @@ func (s *Store) ApplyPlayback(ctx context.Context, roomID, command string, posit
 			_ = tx.Rollback()
 			return domain.PlaybackState{}, domain.NewError(409, "queue_empty", "Queue is empty")
 		}
+		if err := startCurrentHistoryTx(ctx, tx, roomID, &record, now); err != nil {
+			_ = tx.Rollback()
+			return domain.PlaybackState{}, err
+		}
 		record.State.Status = domain.PlaybackPlaying
 		record.State.PausedForEmpty = false
 		record.State.AnchorServerTime = timePointer(now)
@@ -200,10 +204,10 @@ WHERE room_id = ?`, record.State.Revision, record.State.Status, boolInt(record.S
 	return err
 }
 
-func startNextTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time) error {
+func loadNextTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord) (bool, error) {
 	queue, err := listQueue(ctx, tx, roomID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	next := domain.SelectNext(queue, record.PlaybackMode, record.LastContributor)
 	if next == nil {
@@ -214,35 +218,131 @@ func startNextTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *pl
 		record.State.Contributor = ""
 		record.State.ContributorName = ""
 		record.CurrentHistoryID = ""
-		return nil
+		return false, nil
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM queue WHERE room_id = ? AND queue_id = ?", roomID, next.QueueID); err != nil {
-		return err
+		return false, err
 	}
 	if err := normalizeQueueTx(ctx, tx, roomID); err != nil {
-		return err
-	}
-	historyID, err := domain.NewID()
-	if err != nil {
-		return err
-	}
-	trackJSON, err := json.Marshal(next.Track)
-	if err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `
-INSERT INTO playback_history(history_id, room_id, track_json, contributor_username, contributor_display_name, started_unix_ms)
-VALUES (?, ?, ?, ?, ?, ?)`, historyID, roomID, string(trackJSON), next.Contributor, next.ContributorName, unixMillis(now)); err != nil {
-		return err
+		return false, err
 	}
 	record.State.CurrentTrack = &next.Track
 	record.State.PositionSeconds = 0
 	record.State.PausedForEmpty = false
 	record.State.Contributor = next.Contributor
 	record.State.ContributorName = next.ContributorName
-	record.CurrentHistoryID = historyID
+	record.CurrentHistoryID = ""
 	record.LastContributor = next.Contributor
+	return true, nil
+}
+
+func startCurrentHistoryTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time) error {
+	if record.State.CurrentTrack == nil || record.CurrentHistoryID != "" {
+		return nil
+	}
+	historyID, err := domain.NewID()
+	if err != nil {
+		return err
+	}
+	trackJSON, err := json.Marshal(record.State.CurrentTrack)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO playback_history(history_id, room_id, track_json, contributor_username, contributor_display_name, started_unix_ms)
+VALUES (?, ?, ?, ?, ?, ?)`, historyID, roomID, string(trackJSON), record.State.Contributor, record.State.ContributorName, unixMillis(now)); err != nil {
+		return err
+	}
+	record.CurrentHistoryID = historyID
 	return nil
+}
+
+func startNextTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time) error {
+	loaded, err := loadNextTrackTx(ctx, tx, roomID, record)
+	if err != nil || !loaded {
+		return err
+	}
+	return startCurrentHistoryTx(ctx, tx, roomID, record, now)
+}
+
+func primeNextTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time) (bool, error) {
+	if record.State.CurrentTrack != nil {
+		return false, nil
+	}
+	loaded, err := loadNextTrackTx(ctx, tx, roomID, record)
+	if err != nil || !loaded {
+		return loaded, err
+	}
+	record.State.Status = domain.PlaybackPaused
+	record.State.PausedForEmpty = false
+	record.State.PositionSeconds = 0
+	record.State.AnchorServerTime = nil
+	record.State.ServerTime = now.UTC()
+	return true, nil
+}
+
+// PrimePlaybackIfIdle repairs rooms created by older gateway versions where a
+// pending queue existed without a current track. It is also safe to call more
+// than once: only the first successful caller changes the revision.
+func (s *Store) PrimePlaybackIfIdle(ctx context.Context, roomID, actor string) (domain.PlaybackState, bool, error) {
+	s.writeLock.Lock()
+	defer s.writeLock.Unlock()
+	now := time.Now().UTC()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.PlaybackState{}, false, err
+	}
+	record, err := playbackQuery(tx, ctx, roomID, now)
+	if err != nil {
+		_ = tx.Rollback()
+		return domain.PlaybackState{}, false, err
+	}
+	primed, err := primeNextTrackTx(ctx, tx, roomID, &record, now)
+	if err != nil {
+		_ = tx.Rollback()
+		return domain.PlaybackState{}, false, err
+	}
+	if !primed {
+		_ = tx.Rollback()
+		return record.State, false, nil
+	}
+	record.State.Revision++
+	if err := persistPlaybackTx(ctx, tx, roomID, record, now); err != nil {
+		_ = tx.Rollback()
+		return domain.PlaybackState{}, false, err
+	}
+	if err := insertAuditTx(ctx, tx, actor, roomID, "playback.primed", map[string]any{
+		"revision": record.State.Revision, "trackID": record.State.CurrentTrack.ID,
+	}); err != nil {
+		_ = tx.Rollback()
+		return domain.PlaybackState{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return domain.PlaybackState{}, false, err
+	}
+	state, err := s.Playback(ctx, roomID)
+	return state, true, err
+}
+
+func (s *Store) ListIdleQueuedRoomIDs(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT room_id FROM rooms
+WHERE current_track_json IS NULL
+  AND EXISTS (SELECT 1 FROM queue WHERE queue.room_id = rooms.room_id)
+ORDER BY room_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]string, 0)
+	for rows.Next() {
+		var roomID string
+		if err := rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		result = append(result, roomID)
+	}
+	return result, rows.Err()
 }
 
 func finishCurrentTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time) error {
@@ -326,7 +426,7 @@ func (s *Store) ListPlayingRoomIDs(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var result []string
+	result := make([]string, 0)
 	for rows.Next() {
 		var roomID string
 		if err := rows.Scan(&roomID); err != nil {
@@ -364,7 +464,7 @@ FROM playback_history WHERE room_id = ? ORDER BY started_unix_ms DESC LIMIT ? OF
 		return nil, err
 	}
 	defer rows.Close()
-	var result []domain.HistoryEntry
+	result := make([]domain.HistoryEntry, 0)
 	for rows.Next() {
 		entry, err := scanHistory(rows)
 		if err != nil {

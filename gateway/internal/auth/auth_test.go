@@ -40,7 +40,7 @@ func TestExchangeAndImmediateAllowlistRevocation(t *testing.T) {
 	}}
 	manager := NewSessionManager(plugin, NewNavidromeClient(baseURL), 15*time.Minute, 90*time.Second, time.Minute, "https://music.test", "https://rooms.test")
 	exchange, err := manager.Exchange(t.Context(), domain.AuthProof{
-		Username: "alice", Salt: "0123456789abcdef", Token: "0123456789abcdef0123456789abcdef",
+		Username: "alice", Salt: "012345", Token: "0123456789abcdef0123456789abcdef",
 	})
 	if err != nil {
 		t.Fatal(err)

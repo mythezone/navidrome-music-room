@@ -169,7 +169,7 @@ func (s *Server) redeemInvite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listMembers(w http.ResponseWriter, r *http.Request) {
-	_, room, _, err := s.requireRoomAccess(r, true)
+	_, room, _, err := s.requireRoomAccess(r, false)
 	if err != nil {
 		writeError(w, err)
 		return

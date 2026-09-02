@@ -10,3 +10,5 @@ music/
 *.sqlite3-shm
 coverage.out
 .DS_Store
+admin-ui/node_modules/
+room-ui/node_modules/

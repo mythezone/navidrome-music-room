@@ -5,3 +5,7 @@ room-data
 docs
 gateway/coverage.out
 plugin/plugin.wasm
+admin-ui/node_modules
+admin-ui/dist
+room-ui/node_modules
+room-ui/dist

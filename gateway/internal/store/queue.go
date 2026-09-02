@@ -44,7 +44,7 @@ FROM queue WHERE room_id = ? ORDER BY position`, roomID)
 		return nil, err
 	}
 	defer rows.Close()
-	var result []domain.QueueEntry
+	result := make([]domain.QueueEntry, 0)
 	for rows.Next() {
 		entry, err := scanQueueEntry(rows)
 		if err != nil {
@@ -65,29 +65,33 @@ FROM queue WHERE room_id = ? AND queue_id = ?`, roomID, queueID))
 	return entry, err
 }
 
-func (s *Store) AddQueueEntry(ctx context.Context, room domain.Room, entry domain.QueueEntry) (domain.QueueEntry, error) {
+// AddQueueEntry appends a requested track and, when the room is idle, promotes
+// the first pending item to the paused current track in the same transaction.
+// This mirrors the FAIO room contract: clients always get a playable current
+// item after the first request, while only a room manager may start playback.
+func (s *Store) AddQueueEntry(ctx context.Context, room domain.Room, entry domain.QueueEntry) (domain.QueueEntry, *domain.PlaybackState, error) {
 	trackJSON, err := json.Marshal(entry.Track)
 	if err != nil {
-		return domain.QueueEntry{}, err
+		return domain.QueueEntry{}, nil, err
 	}
 	s.writeLock.Lock()
 	defer s.writeLock.Unlock()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return domain.QueueEntry{}, err
+		return domain.QueueEntry{}, nil, err
 	}
 	var status string
 	var queueLimit int
 	if err = tx.QueryRowContext(ctx, "SELECT status, queue_limit FROM rooms WHERE room_id = ?", room.RoomID).Scan(&status, &queueLimit); err != nil {
 		_ = tx.Rollback()
 		if isNotFound(err) {
-			return domain.QueueEntry{}, domain.NewError(404, "room_not_found", "Room was not found")
+			return domain.QueueEntry{}, nil, domain.NewError(404, "room_not_found", "Room was not found")
 		}
-		return domain.QueueEntry{}, err
+		return domain.QueueEntry{}, nil, err
 	}
 	if status != domain.RoomOpen {
 		_ = tx.Rollback()
-		return domain.QueueEntry{}, domain.NewError(409, "room_closed", "Room is closed")
+		return domain.QueueEntry{}, nil, domain.NewError(409, "room_closed", "Room is closed")
 	}
 	var ownCount, totalCount, maxPosition int
 	if err = tx.QueryRowContext(ctx, `
@@ -97,15 +101,15 @@ SELECT
     COALESCE(MAX(position), 0)
 FROM queue WHERE room_id = ?`, entry.Contributor, room.RoomID).Scan(&ownCount, &totalCount, &maxPosition); err != nil {
 		_ = tx.Rollback()
-		return domain.QueueEntry{}, err
+		return domain.QueueEntry{}, nil, err
 	}
 	if ownCount >= queueLimit {
 		_ = tx.Rollback()
-		return domain.QueueEntry{}, domain.ErrorWithDetails(409, "personal_queue_limit", "Personal queue limit reached", map[string]int{"limit": queueLimit})
+		return domain.QueueEntry{}, nil, domain.ErrorWithDetails(409, "personal_queue_limit", "Personal queue limit reached", map[string]int{"limit": queueLimit})
 	}
 	if totalCount >= 1000 {
 		_ = tx.Rollback()
-		return domain.QueueEntry{}, domain.NewError(409, "room_queue_full", "Room queue is full")
+		return domain.QueueEntry{}, nil, domain.NewError(409, "room_queue_full", "Room queue is full")
 	}
 	entry.Position = maxPosition + 1
 	entry.CreatedAt = time.Now().UTC()
@@ -114,18 +118,56 @@ INSERT INTO queue(queue_id, room_id, position, track_json, contributor_username,
 VALUES (?, ?, ?, ?, ?, ?, ?)`, entry.QueueID, room.RoomID, entry.Position, string(trackJSON),
 		entry.Contributor, entry.ContributorName, unixMillis(entry.CreatedAt)); err != nil {
 		_ = tx.Rollback()
-		return domain.QueueEntry{}, err
+		return domain.QueueEntry{}, nil, err
 	}
 	if err = insertAuditTx(ctx, tx, entry.Contributor, room.RoomID, "queue.added", map[string]string{
 		"queueID": entry.QueueID, "trackID": entry.Track.ID,
 	}); err != nil {
 		_ = tx.Rollback()
-		return domain.QueueEntry{}, err
+		return domain.QueueEntry{}, nil, err
+	}
+
+	var primedPlayback *domain.PlaybackState
+	now := entry.CreatedAt
+	record, err := playbackQuery(tx, ctx, room.RoomID, now)
+	if err != nil {
+		_ = tx.Rollback()
+		return domain.QueueEntry{}, nil, err
+	}
+	if record.State.CurrentTrack == nil {
+		primed, primeErr := primeNextTrackTx(ctx, tx, room.RoomID, &record, now)
+		if primeErr != nil {
+			_ = tx.Rollback()
+			return domain.QueueEntry{}, nil, primeErr
+		}
+		if primed {
+			record.State.Revision++
+			if err = persistPlaybackTx(ctx, tx, room.RoomID, record, now); err != nil {
+				_ = tx.Rollback()
+				return domain.QueueEntry{}, nil, err
+			}
+			if err = insertAuditTx(ctx, tx, entry.Contributor, room.RoomID, "playback.primed", map[string]any{
+				"revision": record.State.Revision, "trackID": record.State.CurrentTrack.ID,
+			}); err != nil {
+				_ = tx.Rollback()
+				return domain.QueueEntry{}, nil, err
+			}
+			queue, queueErr := listQueue(ctx, tx, room.RoomID)
+			if queueErr != nil {
+				_ = tx.Rollback()
+				return domain.QueueEntry{}, nil, queueErr
+			}
+			if next := domain.SelectNext(queue, record.PlaybackMode, record.LastContributor); next != nil {
+				record.State.NextTrack = &next.Track
+			}
+			state := record.State
+			primedPlayback = &state
+		}
 	}
 	if err = tx.Commit(); err != nil {
-		return domain.QueueEntry{}, err
+		return domain.QueueEntry{}, nil, err
 	}
-	return entry, nil
+	return entry, primedPlayback, nil
 }
 
 func (s *Store) RemoveQueueEntry(ctx context.Context, roomID, queueID, actor string) error {
