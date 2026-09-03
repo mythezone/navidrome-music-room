@@ -265,25 +265,14 @@ MusicMate is the upcoming native companion for iOS and Android. It will scan the
   </tr>
 </table>
 
-## Work with us
+## Welcome to collaborate
 
-The project is open source and welcomes code, translations, testing, UI ideas and deployment reports.
+The project is open source. We welcome product integration, community collaboration, code, translations, testing, UI ideas and deployment reports.
+
+**Contact:** [mythezone@gmail.com](mailto:mythezone@gmail.com)
 
 - Bugs and feature proposals: [GitHub Issues](https://github.com/mythezone/navidrome-music-room/issues)
 - Pull requests: read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- Product, integration or community collaboration: [mythezone@gmail.com](mailto:mythezone@gmail.com)
 - Security reports: use GitHub's private vulnerability reporting form described in [SECURITY.md](SECURITY.md)
 
 The source is available under GPL-3.0-only. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
-## Buy me a coffee
-
-If Music Room is useful to you, a coffee helps keep testing devices, releases and documentation moving. The project remains open source.
-
-<table>
-  <tr><th>Alipay</th><th>WeChat Pay</th></tr>
-  <tr>
-    <td><img src="docs/assets/donate-alipay.jpg" width="300" alt="Alipay donation QR code" /></td>
-    <td><img src="docs/assets/donate-wechat.jpg" width="300" alt="WeChat Pay donation QR code" /></td>
-  </tr>
-</table>

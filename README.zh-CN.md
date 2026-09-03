@@ -265,25 +265,14 @@ MusicMate 是接下来发布的 iOS / Android 原生客户端。它会扫描同�
   </tr>
 </table>
 
-## 合作方式
+## 欢迎合作
 
-项目完全开源，欢迎代码、翻译、测试、界面建议和不同部署环境的反馈。
+项目完全开源，欢迎产品接入、社区合作、代码、翻译、测试、界面建议和不同部署环境的反馈。
+
+**联系方式：**[mythezone@gmail.com](mailto:mythezone@gmail.com)
 
 - Bug 与功能建议：[GitHub Issues](https://github.com/mythezone/navidrome-music-room/issues)
 - 提交代码：先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- 产品、集成或社区合作：[mythezone@gmail.com](mailto:mythezone@gmail.com)
 - 安全问题：按 [SECURITY.md](SECURITY.md) 使用 GitHub 私密漏洞报告
 
 项目采用 GPL-3.0-only，详见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
-
-## 请我喝杯咖啡
-
-如果 Music Room 对你有帮助，可以请我喝杯咖啡，支持持续测试、发布和完善文档。项目会继续保持开源。
-
-<table>
-  <tr><th>支付宝</th><th>微信支付</th></tr>
-  <tr>
-    <td><img src="docs/assets/donate-alipay.jpg" width="300" alt="支付宝收款码" /></td>
-    <td><img src="docs/assets/donate-wechat.jpg" width="300" alt="微信收款码" /></td>
-  </tr>
-</table>
