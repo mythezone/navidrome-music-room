@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Navidrome Music Room 管理界面公开截图</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 1200px; height: 720px; margin: 0; overflow: hidden; }
+    body {
+      padding: 34px;
+      color: #f7f8fb;
+      background:
+        radial-gradient(circle at 90% 6%, rgba(73,224,209,.16), transparent 30%),
+        linear-gradient(145deg, #0b0e16, #151927);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .window { position: relative; width: 1132px; height: 652px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); border-radius: 24px; background: #222; box-shadow: 0 26px 70px rgba(0,0,0,.42); }
+    .bar { display: flex; align-items: center; gap: 9px; height: 46px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.1); background: #222631; }
+    .bar i { width: 10px; height: 10px; border-radius: 50%; background: #ff6b7f; }
+    .bar i:nth-child(2) { background: #f7ca67; }
+    .bar i:nth-child(3) { background: #4edbc5; }
+    .real-ui { position: absolute; left: 0; top: 46px; width: 1132px; height: 606px; overflow: hidden; }
+    .real-ui img { display: block; width: 1132px; height: auto; transform: translateY(-130px); }
+    .share-panel { position: absolute; right: 24px; bottom: 24px; width: 350px; padding: 23px; border: 1px solid rgba(255,255,255,.15); border-radius: 22px; background: rgba(28,31,40,.97); box-shadow: 0 25px 60px rgba(0,0,0,.48); }
+    .share-panel h2 { margin: 0 0 8px; font-size: 22px; }
+    .share-panel p { margin: 0 0 17px; color: #aeb4c3; font-size: 14px; line-height: 1.55; }
+    .safe-code { display: grid; place-items: center; height: 190px; border-radius: 16px; background: repeating-conic-gradient(#eceff2 0 25%, #242833 0 50%) 0/28px 28px; box-shadow: inset 0 0 0 18px #f7f8fb; }
+    .safe-code span { padding: 12px 16px; border-radius: 999px; color: #16342f; background: #54e0cf; font-size: 14px; font-weight: 800; box-shadow: 0 8px 28px rgba(0,0,0,.3); }
+    .actions { display: flex; gap: 9px; margin-top: 16px; }
+    .actions b { flex: 1; padding: 10px; border-radius: 10px; text-align: center; color: #19222a; background: #93ccff; font-size: 13px; }
+    .actions b:last-child { color: #eef0f4; background: #3b3f4a; }
+    .privacy { position: absolute; left: 25px; bottom: 25px; padding: 11px 15px; border-radius: 999px; color: #c9cdda; background: rgba(22,25,34,.88); border: 1px solid rgba(255,255,255,.13); font-size: 13px; font-weight: 700; backdrop-filter: blur(10px); }
+    .privacy::before { content: "✓"; margin-right: 8px; color: #54e0cf; }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <div class="real-ui"><img src="../../../assets/admin-ui-live.png" alt="真实 Navidrome Music Room 管理界面"></div>
+    <aside class="share-panel">
+      <h2>分享房间</h2>
+      <p>生成邀请链接与二维码；公开截图已隐藏真实令牌。</p>
+      <div class="safe-code"><span>二维码已脱敏</span></div>
+      <div class="actions"><b>复制邀请链接</b><b>复制 Deep Link</b></div>
+    </aside>
+    <div class="privacy">已隐藏测试内网地址与邀请令牌</div>
+  </div>
+</body>
+</html>

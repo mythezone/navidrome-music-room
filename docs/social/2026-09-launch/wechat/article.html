@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>我们把 Navidrome 变成了一个可以一起听歌的房间</title>
+</head>
+<body style="margin:0;background:#edf1ef;color:#202521;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
+  <main style="box-sizing:border-box;width:min(100%,677px);margin:0 auto;padding:48px 26px 70px;background:#fff;box-shadow:0 0 50px rgba(25,52,39,.08);">
+    <p style="margin:0 0 12px;color:#e64667;font-size:13px;font-weight:800;letter-spacing:.14em;">开源项目 · 作者手记</p>
+    <h1 style="margin:0 0 20px;font-size:34px;line-height:1.28;letter-spacing:-.035em;">我们把 Navidrome 变成了一个可以一起听歌的房间</h1>
+    <p style="margin:0 0 34px;color:#68716c;font-size:16px;line-height:1.85;">一个管理员创建房间、一条链接邀请朋友、每个人继续使用自己账号和曲库权限的开源一起听方案。首个公开开发版 <strong style="color:#e64667;">v1.1.0-dev</strong> 现已可以下载测试。</p>
+
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">有一种听歌场景一直有点别扭：歌都认真整理在自己的服务器里，朋友也想一起听，但大家只能在聊天框里倒数“3、2、1，播放”。有人卡了一下、刷新了一次，进度就又散了。</p>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">我们原来已经在 FAIO 里做过一起听歌房。最近，我们把这套能力重新整理成了一个独立开源项目：<strong>Navidrome Music Room</strong>。</p>
+    <p style="margin:0 0 26px;font-size:17px;line-height:1.95;">管理员从 Navidrome 的插件页面进入管理界面，创建一间房，生成邀请链接或二维码；朋友打开链接，用自己的 Navidrome 账号登录，就能在电脑或手机浏览器里加入。房主负责播放、暂停、seek 和切歌，成员可以在共同队列里点歌。</p>
+
+    <figure style="margin:0 0 38px;">
+      <img src="../../../assets/web-room-live.png" alt="真实运行的桌面听歌房" style="box-sizing:border-box;display:block;width:100%;height:auto;border-radius:16px;border:1px solid #e1e7e4;">
+      <figcaption style="margin-top:10px;color:#7b8580;font-size:13px;line-height:1.65;text-align:center;">真实运行界面：左侧是当前播放，右侧是共同待播队列。</figcaption>
+    </figure>
+
+    <h2 style="margin:42px 0 17px;font-size:25px;line-height:1.45;letter-spacing:-.02em;">它适合哪些时刻？</h2>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">我们最先想到的是异地朋友一起重听一张老专辑，也可以是家庭成员共享家里的音乐库，或小型聚会里让大家轮流点歌。</p>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">它并不要求所有人共用管理员密码。每位听众仍然使用自己的 Navidrome 用户，能看见和播放什么，继续由原来的音乐目录权限决定。分享出去的是一间房，不是整台服务器的钥匙。</p>
+
+    <h2 style="margin:42px 0 17px;font-size:25px;line-height:1.45;letter-spacing:-.02em;">Navidrome 是什么？</h2>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;"><a href="https://www.navidrome.org/about/" style="color:#079c59;text-decoration:none;border-bottom:1px solid #79d4a9;">Navidrome</a> 是一个开源、自托管的音乐服务器。你把自己的音乐目录交给它扫描，就可以通过 Web 播放器或兼容客户端浏览、搜索和播放这套曲库。</p>
+    <p style="margin:0 0 27px;font-size:17px;line-height:1.95;">它还兼容 Subsonic 生态；官方文档当前说明其接口兼容 Subsonic API 1.16.1。对我们来说，这一点很重要：搜索、专辑、歌手、封面、歌词和音频流不需要重新发明，Music Room 只需复用这些成熟的曲库接口。<a href="https://www.navidrome.org/docs/developers/subsonic-api/" style="color:#079c59;text-decoration:none;border-bottom:1px solid #79d4a9;">查看官方 API 文档</a></p>
+
+    <figure style="margin:0 0 38px;">
+      <img src="../../../assets/web-room-catalog-live.png" alt="点歌台中的周杰伦专辑结果" style="box-sizing:border-box;display:block;width:100%;height:auto;border-radius:16px;border:1px solid #e1e7e4;">
+      <figcaption style="margin-top:10px;color:#7b8580;font-size:13px;line-height:1.65;text-align:center;">点歌台直接读取 Navidrome 曲库：可以在歌曲、专辑和歌手之间切换，也可以整张专辑加入队列。</figcaption>
+    </figure>
+
+    <h2 style="margin:42px 0 17px;font-size:25px;line-height:1.45;letter-spacing:-.02em;">从安装到第一间房</h2>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">当前是第一个公开开发版本 <code style="padding:2px 6px;border-radius:6px;background:#f2f4f3;color:#d83f60;">v1.1.0-dev</code>。如果想从零开始体验，最简单的方式是下载 Release 中已经打包好的 Docker Compose 套件：</p>
+    <pre style="box-sizing:border-box;margin:23px 0;padding:18px;overflow:auto;border-radius:14px;background:#15221c;color:#e9fff4;font:13px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;"><code>curl -LO https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-compose-1.1.0-dev.tar.gz
+tar -xzf navidrome-music-room-compose-1.1.0-dev.tar.gz
+cd navidrome-music-room-1.1.0-dev
+cp .env.example .env</code></pre>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">在 <code style="padding:2px 6px;border-radius:6px;background:#f2f4f3;">.env</code> 中填入监听地址、公开访问地址和宿主机目录。下面以局域网地址 <code style="padding:2px 6px;border-radius:6px;background:#f2f4f3;">192.168.1.20:1970</code> 为例；音乐目录和配对令牌都要替换。</p>
+    <pre style="box-sizing:border-box;margin:23px 0;padding:18px;overflow:auto;border-radius:14px;background:#15221c;color:#e9fff4;font:13px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;"><code>NAVIDROME_BIND_ADDRESS=0.0.0.0
+NAVIDROME_PORT=1970
+NAVIDROME_PUBLIC_URL=http://192.168.1.20:1970
+MUSIC_ROOM_PUBLIC_URL=http://192.168.1.20:1970/music-room
+MUSIC_LIBRARY_PATH=/srv/music
+NAVIDROME_DATA_PATH=/srv/navidrome/data
+NAVIDROME_PLUGINS_PATH=/srv/navidrome/plugins
+MUSIC_ROOM_PLUGIN_PAIRING_TOKEN=use-a-random-token-of-at-least-32-characters</code></pre>
+    <p style="margin:0 0 12px;font-size:17px;line-height:1.95;">然后运行：</p>
+    <pre style="box-sizing:border-box;margin:18px 0 23px;padding:18px;overflow:auto;border-radius:14px;background:#15221c;color:#e9fff4;font:13px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;"><code>./install.sh "$PWD"
+docker compose ps</code></pre>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">第一次打开 Navidrome 时先创建管理员，并等待音乐扫描完成。接着进入 <strong>Settings → Plugins → Navidrome Music Room</strong>，完成地址、配对令牌和授权用户配置，启用插件，再点击插件的 <strong>Website</strong> 链接。</p>
+    <p style="margin:0 0 27px;font-size:17px;line-height:1.95;">在房间管理页里创建房间、选择音乐目录并生成邀请。对方打开链接后，用自己的 Navidrome 账号登录并兑换邀请，浏览器会进入同一个听歌房。</p>
+
+    <figure style="margin:0 0 38px;overflow:hidden;border-radius:16px;border:1px solid #e1e7e4;">
+      <img src="../assets/admin-ui-public.png" alt="从 Navidrome 打开的房间管理界面，测试地址与邀请令牌已脱敏" style="box-sizing:border-box;display:block;width:100%;height:auto;">
+    </figure>
+    <p style="margin:-26px 0 34px;color:#7b8580;font-size:13px;line-height:1.65;text-align:center;">管理员可以创建、关闭和管理房间，查看成员与邀请；分享弹窗会生成链接和二维码。</p>
+
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">如果你已经运行了 Navidrome，可以只下载 <code style="padding:2px 6px;border-radius:6px;background:#f2f4f3;">.ndp</code>、网关与反向代理配置。我们更推荐先按 Release 中的 Compose 示例对照安装，因为浏览器房间还需要同源的 <code style="padding:2px 6px;border-radius:6px;background:#f2f4f3;">/music-room/</code> 网关路由。完整命令、现有曲库迁移方式和回滚说明都在 <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev" style="color:#079c59;text-decoration:none;border-bottom:1px solid #79d4a9;">v1.1.0-dev Release</a> 里。</p>
+
+    <h2 style="margin:42px 0 17px;font-size:25px;line-height:1.45;letter-spacing:-.02em;">为什么还有一个伴生网关？</h2>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">Navidrome 的插件是运行在沙箱中的 WebAssembly 模块，并通过显式权限访问用户、调度器、HTTP 和键值存储等能力。这样的边界很适合做授权同步，但官方当前的 <code style="padding:2px 6px;border-radius:6px;background:#f2f4f3;">.ndp</code> 扩展点并不能承载听歌房需要的浏览器入站页面和 WebSocket 路由。<a href="https://www.navidrome.org/docs/usage/features/plugins/" style="color:#079c59;text-decoration:none;border-bottom:1px solid #79d4a9;">查看官方插件文档</a></p>
+    <p style="margin:0 0 13px;font-size:17px;line-height:1.95;">所以我们采用了“插件 + 本地伴生网关”的结构：</p>
+    <ol style="margin:0 0 23px;padding-left:25px;color:#2d342f;font-size:17px;line-height:1.95;">
+      <li style="margin-bottom:9px;"><strong>.ndp 插件</strong>同步 Navidrome 授权用户、管理员身份和租约心跳。</li>
+      <li style="margin-bottom:9px;"><strong>Go 网关</strong>提供房间、邀请、成员、队列、播放状态和 WebSocket 实时事件。</li>
+      <li style="margin-bottom:9px;"><strong>React + Material UI</strong> 管理界面从插件 Website 入口打开。</li>
+      <li><strong>Vue + Pinia</strong> Web 听歌房负责桌面与手机端播放体验。</li>
+    </ol>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">我们没有让网关代理音频。房间事件只携带 Navidrome 曲目 ID；每个浏览器用自己的登录状态，直接向 Navidrome 请求音频、封面和歌词。这样既避免多绕一跳，也不会借用房主账号绕过曲库 ACL。</p>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">播放同步使用服务端权威时间戳和递增 revision。播放、暂停、seek、切歌或重排队列都会形成新的房间状态；客户端刷新或断线重连后先恢复最新快照，再根据服务器时间计算当前位置。浏览器自动播放策略仍然要求每个人首次进入时点击一次“开始听歌”，这也是界面上保留显式按钮的原因。</p>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">房间、成员、邀请、队列和历史记录保存在插件目录下的独立 SQLite 数据库中，不创建或修改 Navidrome 数据表。备份或卸载时，两边的数据边界也更容易看清。</p>
+
+    <blockquote style="margin:30px 0;padding:19px 21px;border-left:4px solid #ff5b78;border-radius:0 14px 14px 0;background:#fff3f6;color:#55343d;font-size:16px;line-height:1.85;">房间同步的是“大家此刻应该听到什么”，不是替任何人取得更多曲库权限。</blockquote>
+
+    <h2 style="margin:42px 0 17px;font-size:25px;line-height:1.45;letter-spacing:-.02em;">现在已经做到哪里？</h2>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;"><code style="padding:2px 6px;border-radius:6px;background:#f2f4f3;color:#d83f60;">v1.1.0-dev</code> 已完成真实浏览器双客户端、桌面与 390 px 手机布局、刷新重连、不同用户曲库 ACL 隔离，以及实际音频 Range 请求测试。歌曲、专辑、歌手浏览和整张专辑点播也已经接入。</p>
+    <p style="margin:0 0 27px;font-size:17px;line-height:1.95;">当前还不能把“点播到房间”原生插进 Navidrome 的歌曲或专辑页面，也不能直接往它的左侧栏添加入口，因为官方插件接口还没有对应扩展点。我们没有用前端注入去绕过它，而是把完整点歌台放在房间 Web 界面中，继续使用同一套 OpenSubsonic 数据。</p>
+
+    <figure style="margin:0 auto 34px;max-width:315px;">
+      <img src="../../../assets/web-room-mobile.png" alt="390 像素手机浏览器中的点歌台" style="box-sizing:border-box;display:block;width:100%;height:auto;border-radius:24px;border:7px solid #11131b;box-shadow:0 24px 50px rgba(20,27,23,.18);">
+      <figcaption style="margin-top:10px;color:#7b8580;font-size:13px;line-height:1.65;text-align:center;">分享链接可以直接在手机浏览器里打开；未来的 MusicMate App 也会连接同一种房间协议。</figcaption>
+    </figure>
+    <p style="margin:0 0 19px;font-size:17px;line-height:1.95;">接下来，我们会继续打磨安装体验、浏览器兼容性和房间功能，也会推进 MusicMate App 对 Navidrome 房间链接的支持。后续工作会继续在公开仓库中推进。</p>
+
+    <section style="margin-top:46px;padding:26px 24px;border-radius:19px;background:linear-gradient(145deg,#effbf5,#fff4f6);border:1px solid #dcece4;">
+      <p style="margin:0 0 9px;color:#079c59;font-size:13px;font-weight:800;letter-spacing:.12em;">COME BUILD WITH US</p>
+      <h2 style="margin:0 0 15px;font-size:25px;line-height:1.45;">欢迎来跑一遍真实链路</h2>
+      <p style="margin:0 0 15px;font-size:16px;line-height:1.9;">GitHub：<a href="https://github.com/mythezone/navidrome-music-room" style="color:#d83f60;text-decoration:none;font-weight:750;overflow-wrap:anywhere;">mythezone/navidrome-music-room</a></p>
+      <p style="margin:0 0 15px;font-size:16px;line-height:1.9;">如果你正在使用 Navidrome，欢迎下载 v1.1.0-dev，在自己的曲库和网络环境里创建一间房。安装、反向代理、不同浏览器同步和交互体验方面的反馈，都对第一个稳定版本很重要。</p>
+      <p style="margin:0;font-size:16px;line-height:1.9;">喜欢这个方向，可以顺手点一个 Star；发现问题请提交 Issue，有明确修复或新适配也非常欢迎 PR。合作与交流：<strong>mythezone@gmail.com</strong></p>
+    </section>
+
+    <p style="margin:30px 0 0;color:#626b66;font-size:15px;line-height:1.85;">我们会认真回复每一条可复现的问题和修改建议，也期待这个项目能被更多 Navidrome 用户一起做得更好。</p>
+    <hr style="height:1px;margin:42px 0 24px;border:0;background:#e7ebe9;">
+    <p style="margin:0 0 10px;color:#818984;font-size:13px;font-weight:700;">资料</p>
+    <ul style="margin:0;padding-left:20px;color:#747d78;font-size:13px;line-height:1.85;">
+      <li><a href="https://www.navidrome.org/about/" style="color:#62766b;">Navidrome 官方介绍</a></li>
+      <li><a href="https://www.navidrome.org/docs/usage/features/plugins/" style="color:#62766b;">Navidrome 插件文档</a></li>
+      <li><a href="https://www.navidrome.org/docs/developers/subsonic-api/" style="color:#62766b;">Navidrome Subsonic API 文档</a></li>
+      <li><a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev" style="color:#62766b;">Navidrome Music Room v1.1.0-dev</a></li>
+    </ul>
+  </main>
+</body>
+</html>
