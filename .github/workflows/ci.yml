@@ -106,7 +106,7 @@ jobs:
         run: docker run --rm -v "$PWD/dist:/dist:ro" deluan/navidrome:0.63.2 plugin validate /dist/navidrome-music-room.ndp
       - name: Validate with latest stable Navidrome
         run: docker run --rm -v "$PWD/dist:/dist:ro" deluan/navidrome:latest plugin validate /dist/navidrome-music-room.ndp
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plugin
           path: dist/navidrome-music-room.ndp
