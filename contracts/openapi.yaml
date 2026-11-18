@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Navidrome Music Room Gateway API
-  version: 1.1.0-dev
+  version: 1.2.0
   license:
     name: GPL-3.0-only
     identifier: GPL-3.0-only
@@ -9,19 +9,28 @@ info:
     Versioned room coordination API for MusicMate. Media bytes never pass through this API;
     clients stream audio, artwork, and lyrics directly from Navidrome with their own credentials.
 servers:
-  - url: https://music.example.com/music-room/api/v1
+  - url: https://music.example.test/music-room/api/v1
 security:
   - roomSession: []
 tags:
   - name: Auth
+    description: Navidrome authentication and gateway discovery.
   - name: Rooms
+    description: Room settings, membership, presence, and snapshots.
   - name: Invitations
+    description: Persistent room membership through revocable invitations.
   - name: Playback
+    description: Synchronized playback, queue management, and history.
   - name: Capabilities
+    description: Features available in this release.
   - name: Updates
+    description: Administrative diagnostics and signed releases.
+  - name: Community
+    description: Room chat, stickers, statistics, achievements, and song wishes.
 paths:
   /discovery:
     get:
+      operationId: getDiscovery
       tags: [Auth]
       summary: Resolve the Navidrome public URL for an HTTPS invitation link
       security: []
@@ -33,6 +42,7 @@ paths:
               schema: { $ref: '#/components/schemas/Discovery' }
   /auth/exchange:
     post:
+      operationId: postAuthExchange
       tags: [Auth]
       summary: Exchange an OpenSubsonic salt/token proof for a 15-minute room session
       security: []
@@ -55,6 +65,7 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
   /auth/session:
     delete:
+      operationId: deleteAuthSession
       tags: [Auth]
       summary: Revoke the current in-memory room session
       responses:
@@ -62,6 +73,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /rooms:
     get:
+      operationId: getRooms
       tags: [Rooms]
       summary: List rooms visible to the current user
       responses:
@@ -77,6 +89,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Room' }
     post:
+      operationId: postRooms
       tags: [Rooms]
       summary: Create a room
       description: Requires both Navidrome adminRole and plugin authorization.
@@ -99,6 +112,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RoomID'
     get:
+      operationId: getRoomsRoomId
       tags: [Rooms]
       summary: Read one room
       responses:
@@ -110,6 +124,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
     patch:
+      operationId: patchRoomsRoomId
       tags: [Rooms]
       summary: Update a room as owner or administrator
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
@@ -126,6 +141,7 @@ paths:
               schema: { $ref: '#/components/schemas/Room' }
         '403': { $ref: '#/components/responses/Error' }
     delete:
+      operationId: deleteRoomsRoomId
       tags: [Rooms]
       summary: Permanently delete a room as owner or administrator
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
@@ -134,6 +150,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/close:
     post:
+      operationId: postRoomsRoomIdClose
       tags: [Rooms]
       summary: Close a room to new joins and queue changes
       parameters:
@@ -148,6 +165,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/reopen:
     post:
+      operationId: postRoomsRoomIdReopen
       tags: [Rooms]
       summary: Reopen a room when the plugin lease is healthy
       parameters:
@@ -163,6 +181,7 @@ paths:
   /rooms/{room_id}/invites:
     parameters: [{ $ref: '#/components/parameters/RoomID' }]
     get:
+      operationId: getRoomsRoomIdInvites
       tags: [Invitations]
       summary: List invitation metadata without secrets
       responses:
@@ -177,6 +196,7 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Invite' }
     post:
+      operationId: postRoomsRoomIdInvites
       tags: [Invitations]
       summary: Create a revocable invitation
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
@@ -199,6 +219,7 @@ paths:
               schema: { $ref: '#/components/schemas/InviteWithSecret' }
   /rooms/{room_id}/invites/{invite_id}:
     delete:
+      operationId: deleteRoomsRoomIdInvitesInviteId
       tags: [Invitations]
       summary: Revoke an invitation without removing existing members
       parameters:
@@ -213,6 +234,7 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
   /invites/redeem:
     post:
+      operationId: postInvitesRedeem
       tags: [Invitations]
       summary: Redeem an invitation into persistent room membership
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
@@ -240,6 +262,7 @@ paths:
         '410': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/members:
     get:
+      operationId: getRoomsRoomIdMembers
       tags: [Rooms]
       summary: List persistent members with current presence
       parameters: [{ $ref: '#/components/parameters/RoomID' }]
@@ -256,6 +279,7 @@ paths:
                     items: { $ref: '#/components/schemas/Member' }
   /rooms/{room_id}/members/{username}:
     delete:
+      operationId: deleteRoomsRoomIdMembersUsername
       tags: [Rooms]
       summary: Remove a member and disconnect their room WebSockets
       parameters:
@@ -271,6 +295,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/join:
     post:
+      operationId: postRoomsRoomIdJoin
       tags: [Rooms]
       summary: Enter a room after membership and library checks
       parameters:
@@ -281,6 +306,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/leave:
     post:
+      operationId: postRoomsRoomIdLeave
       tags: [Rooms]
       summary: Deactivate the current membership
       parameters:
@@ -291,6 +317,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/snapshot:
     get:
+      operationId: getRoomsRoomIdSnapshot
       tags: [Rooms]
       summary: Read the authoritative room snapshot
       parameters: [{ $ref: '#/components/parameters/RoomID' }]
@@ -302,6 +329,7 @@ paths:
               schema: { $ref: '#/components/schemas/Snapshot' }
   /rooms/{room_id}/history:
     get:
+      operationId: getRoomsRoomIdHistory
       tags: [Playback]
       summary: Read playback history
       parameters:
@@ -312,8 +340,10 @@ paths:
         '200': { description: History page }
   /rooms/{room_id}/playback:
     post:
+      operationId: postRoomsRoomIdPlayback
       tags: [Playback]
-      summary: Change authoritative playback as owner or administrator
+      summary: Change authoritative playback
+      description: Play, pause, seek, previous, and stop require a manager. Next also allows members when allowMemberSkip is true or they contributed the current track; otherwise returns skip_permission_required (403). Previous resets the current track above five seconds, otherwise loads the last finished history entry and returns the current track to the queue front.
       parameters:
         - $ref: '#/components/parameters/RoomID'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -325,7 +355,7 @@ paths:
               type: object
               required: [command, expectedRevision]
               properties:
-                command: { type: string, enum: [play, pause, seek, next, stop] }
+                command: { type: string, enum: [play, pause, seek, next, previous, stop] }
                 expectedRevision: { type: integer, format: int64, minimum: 0 }
                 positionSeconds: { type: number, minimum: 0 }
       responses:
@@ -334,6 +364,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Playback' }
+        '403':
+          description: skip_permission_required for a disallowed next; room_manager_required for other controls.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         '409':
           description: Includes `details.latest` when code is `revision_conflict`
           content:
@@ -341,6 +376,7 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
   /rooms/{room_id}/queue/tracks:
     post:
+      operationId: postRoomsRoomIdQueueTracks
       tags: [Playback]
       summary: Add an accessible Navidrome track to the member's pending queue
       parameters:
@@ -354,6 +390,7 @@ paths:
               type: object
               required: [track]
               properties:
+                playNext: { type: boolean, default: false, description: Insert at position 1; requires a room manager. }
                 track: { $ref: '#/components/schemas/TrackRef' }
       responses:
         '201':
@@ -365,6 +402,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/queue/{queue_id}:
     delete:
+      operationId: deleteRoomsRoomIdQueueQueueId
       tags: [Playback]
       summary: Remove one's own pending entry, or any entry as a manager
       parameters:
@@ -379,6 +417,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/queue/order:
     put:
+      operationId: putRoomsRoomIdQueueOrder
       tags: [Playback]
       summary: Reorder the complete queue as a manager
       parameters:
@@ -401,6 +440,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
   /rooms/{room_id}/ws-ticket:
     post:
+      operationId: postRoomsRoomIdWsTicket
       tags: [Rooms]
       summary: Create a one-use WebSocket ticket valid for 60 seconds
       parameters:
@@ -420,11 +460,15 @@ paths:
                   webSocketURL: { type: string, format: uri }
   /rooms/{room_id}/ws:
     get:
+      operationId: getRoomsRoomIdWs
+      x-websocket-message: { $ref: '#/components/schemas/Event' }
       tags: [Rooms]
       summary: Upgrade to the room WebSocket
       description: |
         The `ticket` query value is one-use and expires after 60 seconds. Server events are
-        `snapshot`, `playback`, `queue`, `history`, `presence`, `room_updated`, and `error`.
+        `snapshot`, `playback`, `queue`, `history`, `presence`, `room_updated`, `chat_message`, `chat_updated`, `wish_updated`, `wish_deleted`,
+        `update_available` (Navidrome admins only), and `error`. Payloads follow the Event schema.
+        Chat and wish changes contain their full objects; wish_deleted contains wishID.
       security: []
       parameters:
         - $ref: '#/components/parameters/RoomID'
@@ -434,6 +478,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /capabilities:
     get:
+      operationId: getCapabilities
       tags: [Capabilities]
       summary: Return the current open-source feature availability
       responses:
@@ -444,6 +489,7 @@ paths:
               schema: { $ref: '#/components/schemas/FeatureAvailability' }
   /admin/diagnostics:
     get:
+      operationId: getAdminDiagnostics
       tags: [Updates]
       summary: Explicitly export an automatically redacted diagnostic bundle
       description: Returns aggregate runtime, plugin heartbeat, update, and database health only; no URLs, names, room identifiers, invitations, credentials, or row data are included.
@@ -457,25 +503,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DiagnosticBundle' }
         '403': { $ref: '#/components/responses/Error' }
-  /rooms/{room_id}/{unimplemented_feature}:
-    get:
-      tags: [Capabilities]
-      summary: Return a uniform response for planned features
-      description: These open-source roadmap endpoints are not implemented in this release.
-      parameters:
-        - $ref: '#/components/parameters/RoomID'
-        - name: unimplemented_feature
-          in: path
-          required: true
-          schema: { type: string, enum: [chat, stickers, statistics, rankings, achievements] }
-      responses:
-        '501':
-          description: Feature is not implemented in this release
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
   /admin/updates:
     get:
+      operationId: getAdminUpdates
       tags: [Updates]
       summary: Read local updater state as a Navidrome administrator
       responses:
@@ -485,14 +515,18 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status, repository, managedByLauncher, actions]
+                required: [status, repository, managedByLauncher, actions, pluginVersion, pluginPaired, versionMismatch]
                 properties:
                   status: { $ref: '#/components/schemas/UpdateStatus' }
+                  pluginVersion: { type: string }
+                  pluginPaired: { type: boolean }
+                  versionMismatch: { type: boolean }
                   repository: { type: string }
                   managedByLauncher: { type: boolean }
                   actions: { type: array, items: { type: string, enum: [check, stage, install, rollback] } }
         '403': { $ref: '#/components/responses/Error' }
     post:
+      operationId: postAdminUpdates
       tags: [Updates]
       summary: Check, stage, install, or roll back a signed GitHub release
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
@@ -510,8 +544,628 @@ paths:
         '200': { description: Check completed }
         '202': { description: 'Stage, activation, or rollback accepted' }
         '409': { $ref: '#/components/responses/Error' }
+  /rooms/{room_id}/queue/shuffle:
+    post:
+      operationId: postRoomsRoomIdQueueShuffle
+      tags:
+      - Playback
+      summary: Shuffle the pending queue as a manager
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Shuffle the pending queue as a manager
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueList'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      description: Keep queue[0] fixed; shuffle queue[1:] only when at least three entries remain.
+  /rooms/{room_id}/queue/{queue_id}/top:
+    post:
+      operationId: postRoomsRoomIdQueueQueueIdTop
+      tags:
+      - Playback
+      summary: Move a pending entry to position 1 as a manager
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: queue_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Move a pending entry to position 1 as a manager
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueList'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /rooms/{room_id}/history/{history_id}/requeue:
+    post:
+      operationId: postRoomsRoomIdHistoryHistoryIdRequeue
+      tags:
+      - Playback
+      summary: Request a history track again as an active member
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: history_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Request a history track again as an active member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueMutation'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      description: Requires an open room and current Navidrome library access. Track metadata is revalidated; increments
+        requestedCount and primes idle playback.
+  /rooms/{room_id}/chat:
+    get:
+      operationId: getRoomsRoomIdChat
+      tags:
+      - Community
+      summary: Read a chronological page of room messages
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: before
+        in: query
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      responses:
+        '200':
+          description: Read a chronological page of room messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatPage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      description: Messages are oldest to newest within the page. Pass nextBefore to load older messages. Recalled
+        and deleted messages remain as empty tombstones, including in reply previews.
+    post:
+      operationId: postRoomsRoomIdChat
+      tags:
+      - Community
+      summary: Send a chat message or review
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Send a chat message or review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCreate'
+      description: Limited to 20 messages per minute per user across rooms (chat_rate_limited). Broadcasts chat_message.
+  /rooms/{room_id}/chat/{message_id}/recall:
+    post:
+      operationId: postRoomsRoomIdChatMessageIdRecall
+      tags:
+      - Community
+      summary: Recall your own message within five minutes
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Recall your own message within five minutes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      description: Clears text, sticker, mentions, and references; broadcasts chat_updated.
+  /rooms/{room_id}/chat/{message_id}:
+    delete:
+      operationId: deleteRoomsRoomIdChatMessageId
+      tags:
+      - Community
+      summary: Delete your own message or moderate as a manager
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Delete your own message or moderate as a manager
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      description: Persists a tombstone and broadcasts chat_updated.
+  /rooms/{room_id}/stickers:
+    get:
+      operationId: getRoomsRoomIdStickers
+      tags:
+      - Community
+      summary: List the two built-in localized sticker packs
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      responses:
+        '200':
+          description: List the two built-in localized sticker packs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StickerPacks'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /rooms/{room_id}/statistics:
+    get:
+      operationId: getRoomsRoomIdStatistics
+      tags:
+      - Community
+      summary: Read room statistics
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: period
+        in: query
+        description: UTC calendar period, with weeks starting Monday.
+        schema:
+          type: string
+          enum:
+          - all
+          - year
+          - month
+          - week
+          - day
+          default: all
+      responses:
+        '200':
+          description: Read room statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomStatistics'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /rooms/{room_id}/rankings:
+    get:
+      operationId: getRoomsRoomIdRankings
+      tags:
+      - Community
+      summary: Read member and music rankings
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: period
+        in: query
+        description: UTC calendar period, with weeks starting Monday.
+        schema:
+          type: string
+          enum:
+          - all
+          - year
+          - month
+          - week
+          - day
+          default: all
+      responses:
+        '200':
+          description: Read member and music rankings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomRankings'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /rooms/{room_id}/achievements:
+    get:
+      operationId: getRoomsRoomIdAchievements
+      tags:
+      - Community
+      summary: Read your profile and achievements
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      responses:
+        '200':
+          description: Read your profile and achievements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberProfile'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /rooms/{room_id}/members/{username}/profile:
+    get:
+      operationId: getRoomsRoomIdMembersUsernameProfile
+      tags:
+      - Community
+      summary: Read a room member profile
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: username
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Read a room member profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberProfile'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /rooms/{room_id}/achievements/selected:
+    put:
+      operationId: putRoomsRoomIdAchievementsSelected
+      tags:
+      - Community
+      summary: Select an unlocked badge or clear with an empty ID
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Select an unlocked badge or clear with an empty ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberProfile'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BadgeSelection'
+  /rooms/{room_id}/wishes:
+    get:
+      operationId: getRoomsRoomIdWishes
+      tags:
+      - Community
+      summary: List song wishes
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - pending
+          - fulfilled
+          default: all
+      responses:
+        '200':
+          description: List song wishes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WishList'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postRoomsRoomIdWishes
+      tags:
+      - Community
+      summary: Create a song wish
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Create a song wish
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wish'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WishCreate'
+      description: At most 50 pending wishes per user per room (wish_limit_reached). Broadcasts wish_updated.
+  /rooms/{room_id}/wishes/{wish_id}/fulfill:
+    post:
+      operationId: postRoomsRoomIdWishesWishIdFulfill
+      tags:
+      - Community
+      summary: Fulfill a wish as a room manager
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: wish_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Fulfill a wish as a room manager
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wish'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WishFulfill'
+      description: Broadcasts wish_updated.
+  /rooms/{room_id}/wishes/{wish_id}:
+    delete:
+      operationId: deleteRoomsRoomIdWishesWishId
+      tags:
+      - Community
+      summary: Delete a pending wish you authored or any wish as a manager
+      parameters:
+      - $ref: '#/components/parameters/RoomID'
+      - name: wish_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Delete a pending wish you authored or any wish as a manager
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+      description: Broadcasts wish_deleted with a wishID payload.
+  /admin:
+    servers:
+    - url: https://music.example.test/music-room
+    get:
+      operationId: getAdmin
+      tags:
+      - Updates
+      summary: Redirect the admin console to its trailing slash URL
+      security: []
+      responses:
+        '308':
+          description: Prefix-preserving relative redirect
+          headers:
+            Location:
+              schema:
+                type: string
+                const: admin/
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+  /internal/v1/plugin-sync:
+    servers:
+      - url: https://music.example.test/music-room
+    post:
+      operationId: syncPlugin
+      tags: [Updates]
+      summary: Synchronize authorized Navidrome users and renew the bridge lease
+      security: [{ pluginPairing: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PluginSync' }
+      responses:
+        '200':
+          description: Accepted heartbeat and cached update availability for the configured channel
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PluginSyncResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
+    pluginPairing:
+      type: http
+      scheme: bearer
+      description: Shared plugin pairing token configured in Navidrome and the gateway.
     roomSession:
       type: http
       scheme: bearer
@@ -596,6 +1250,7 @@ components:
           uniqueItems: true
           items: { type: integer, minimum: 1 }
         preloadNextTrack: { type: boolean, default: true }
+        allowMemberSkip: { type: boolean, default: true }
     RoomPatch:
       type: object
       additionalProperties: false
@@ -609,15 +1264,16 @@ components:
           uniqueItems: true
           items: { type: integer, minimum: 1 }
         preloadNextTrack: { type: boolean }
+        allowMemberSkip: { type: boolean }
     Capabilities:
       type: object
       required: [chat, stickers, statistics, rankings, achievements, uploads, onlineSources, invites, queue, history]
       properties:
-        chat: { type: boolean, const: false }
-        stickers: { type: boolean, const: false }
-        statistics: { type: boolean, const: false }
-        rankings: { type: boolean, const: false }
-        achievements: { type: boolean, const: false }
+        chat: { type: boolean, const: true }
+        stickers: { type: boolean, const: true }
+        statistics: { type: boolean, const: true }
+        rankings: { type: boolean, const: true }
+        achievements: { type: boolean, const: true }
         uploads: { type: boolean, const: false }
         onlineSources: { type: boolean, const: false }
         invites: { type: boolean, const: true }
@@ -625,7 +1281,7 @@ components:
         history: { type: boolean, const: true }
     Room:
       type: object
-      required: [roomID, name, ownerUsername, ownerDisplayName, status, queueLimit, playbackMode, musicFolderIDs, preloadNextTrack, capabilities, onlineCount, createdAt, updatedAt]
+      required: [roomID, name, ownerUsername, ownerDisplayName, status, queueLimit, playbackMode, musicFolderIDs, preloadNextTrack, allowMemberSkip, capabilities, onlineCount, createdAt, updatedAt]
       properties:
         roomID: { $ref: '#/components/schemas/Identifier' }
         name: { type: string }
@@ -638,6 +1294,7 @@ components:
           type: array
           items: { type: integer }
         preloadNextTrack: { type: boolean }
+        allowMemberSkip: { type: boolean }
         capabilities: { $ref: '#/components/schemas/Capabilities' }
         onlineCount: { type: integer, minimum: 0 }
         createdAt: { type: string, format: date-time }
@@ -726,7 +1383,7 @@ components:
         contributorDisplayName: { type: string }
     Snapshot:
       type: object
-      required: [room, self, members, queue, playback, history, generatedAt]
+      required: [room, self, members, queue, playback, history, permissions, generatedAt]
       properties:
         room: { $ref: '#/components/schemas/Room' }
         self: { $ref: '#/components/schemas/Member' }
@@ -737,7 +1394,9 @@ components:
           type: array
           items: { $ref: '#/components/schemas/QueueEntry' }
         playback: { $ref: '#/components/schemas/Playback' }
-        history: { type: array, items: { type: object } }
+        history: { type: array, items: { $ref: '#/components/schemas/HistoryEntry' } }
+        permissions: { $ref: '#/components/schemas/RoomPermissions' }
+        updateNotice: { $ref: '#/components/schemas/UpdateNotice' }
         generatedAt: { type: string, format: date-time }
     FeatureAvailability:
       type: object
@@ -795,7 +1454,7 @@ components:
         update: { type: object, additionalProperties: true }
     UpdateStatus:
       type: object
-      required: [currentVersion, channel, updateAvailable, rollbackAvailable, state]
+      required: [currentVersion, channel, updateAvailable, rollbackAvailable, state, prerelease]
       properties:
         currentVersion: { type: string }
         channel: { type: string, enum: [stable, beta] }
@@ -803,6 +1462,9 @@ components:
         updateAvailable: { type: boolean }
         releaseURL: { type: string, format: uri }
         checkedAt: { type: string, format: date-time }
+        publishedAt: { type: string, format: date-time }
+        prerelease: { type: boolean }
+        releaseNotes: { type: string, maxLength: 4000 }
         stagedVersion: { type: string }
         rollbackVersion: { type: string }
         rollbackAvailable: { type: boolean }
@@ -819,3 +1481,788 @@ components:
             code: { type: string }
             message: { type: string }
             details: {}
+    RoomPermissions:
+      type: object
+      required:
+      - canManage
+      - canControl
+      - canSkip
+      - canReorderQueue
+      - canFulfillWish
+      properties:
+        canManage:
+          type: boolean
+        canControl:
+          type: boolean
+        canSkip:
+          type: boolean
+        canReorderQueue:
+          type: boolean
+        canFulfillWish:
+          type: boolean
+    UpdateNotice:
+      type: object
+      required:
+      - currentVersion
+      - latestVersion
+      - channel
+      properties:
+        currentVersion:
+          type: string
+        latestVersion:
+          type: string
+        channel:
+          type: string
+          enum:
+          - stable
+          - beta
+        releaseURL:
+          type: string
+          format: uri
+    HistoryEntry:
+      type: object
+      required:
+      - historyID
+      - track
+      - contributorUsername
+      - contributorDisplayName
+      - startedAt
+      - playedSeconds
+      properties:
+        historyID:
+          $ref: '#/components/schemas/Identifier'
+        roomID:
+          $ref: '#/components/schemas/Identifier'
+        track:
+          $ref: '#/components/schemas/TrackRef'
+        contributorUsername:
+          type: string
+        contributorDisplayName:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        playedSeconds:
+          type: number
+          minimum: 0
+    QueueList:
+      type: object
+      required:
+      - queue
+      properties:
+        queue:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueEntry'
+    ChatReference:
+      type: object
+      required:
+      - kind
+      - id
+      - title
+      properties:
+        kind:
+          type: string
+          enum:
+          - track
+          - album
+          - artist
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        artist:
+          type: string
+          maxLength: 300
+      additionalProperties: false
+    ChatCreate:
+      type: object
+      required: []
+      properties:
+        messageType:
+          type: string
+          enum:
+          - chat
+          - review
+          default: chat
+        body:
+          type: string
+          maxLength: 4000
+        stickerID:
+          type: string
+        replyToID:
+          $ref: '#/components/schemas/Identifier'
+        mentions:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 128
+        references:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatReference'
+          maxItems: 10
+      description: At least one non-empty body, valid stickerID, or reference is required. Mentions must identify active
+        room members.
+      additionalProperties: false
+    ChatReplyPreview:
+      type: object
+      required:
+      - messageID
+      - senderUsername
+      - senderDisplayName
+      - body
+      - stickerID
+      properties:
+        messageID:
+          $ref: '#/components/schemas/Identifier'
+        senderUsername:
+          type: string
+        senderDisplayName:
+          type: string
+        body:
+          type: string
+          maxLength: 160
+        stickerID:
+          type: string
+        recalledAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+    ChatMessage:
+      type: object
+      required:
+      - messageID
+      - roomID
+      - senderUsername
+      - senderDisplayName
+      - messageType
+      - body
+      - stickerID
+      - replyToID
+      - mentions
+      - references
+      - createdAt
+      properties:
+        messageID:
+          $ref: '#/components/schemas/Identifier'
+        roomID:
+          $ref: '#/components/schemas/Identifier'
+        senderUsername:
+          type: string
+        senderDisplayName:
+          type: string
+        messageType:
+          type: string
+          enum:
+          - chat
+          - review
+          - system
+        body:
+          type: string
+        stickerID:
+          type: string
+        replyToID:
+          type: string
+        mentions:
+          type: array
+          items:
+            type: string
+        references:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatReference'
+        replyPreview:
+          $ref: '#/components/schemas/ChatReplyPreview'
+        recalledAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    ChatPage:
+      type: object
+      required:
+      - messages
+      - hasMore
+      - nextBefore
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        hasMore:
+          type: boolean
+        nextBefore:
+          type: string
+    Sticker:
+      type: object
+      required:
+      - stickerID
+      - packID
+      - emoji
+      - code
+      - labels
+      properties:
+        stickerID:
+          type: string
+        packID:
+          type: string
+        emoji:
+          type: string
+        code:
+          type: string
+        labels:
+          type: object
+          required:
+          - en
+          - zh-CN
+          - zh-TW
+          - ja
+          - es
+          - fr
+          - de
+          properties:
+            en:
+              type: string
+            zh-CN:
+              type: string
+            zh-TW:
+              type: string
+            ja:
+              type: string
+            es:
+              type: string
+            fr:
+              type: string
+            de:
+              type: string
+    StickerPack:
+      type: object
+      required:
+      - packID
+      - stickers
+      properties:
+        packID:
+          type: string
+          enum:
+          - vibes
+          - reactions
+        stickers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sticker'
+          minItems: 8
+          maxItems: 8
+    StickerPacks:
+      type: object
+      required:
+      - packs
+      properties:
+        packs:
+          type: array
+          items:
+            $ref: '#/components/schemas/StickerPack'
+          minItems: 2
+          maxItems: 2
+    WishResource:
+      type: object
+      required:
+      - title
+      - url
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        url:
+          type: string
+          format: uri
+          pattern: ^https?://
+          maxLength: 2048
+      additionalProperties: false
+    WishCreate:
+      type: object
+      required:
+      - kind
+      - title
+      properties:
+        kind:
+          type: string
+          enum:
+          - track
+          - album
+          - artist
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        artist:
+          type: string
+          maxLength: 300
+        reason:
+          type: string
+          maxLength: 2000
+      additionalProperties: false
+    WishFulfill:
+      type: object
+      required: []
+      properties:
+        responseNote:
+          type: string
+          maxLength: 2000
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/WishResource'
+          maxItems: 10
+      additionalProperties: false
+    Wish:
+      type: object
+      required:
+      - wishID
+      - roomID
+      - authorUsername
+      - authorDisplayName
+      - kind
+      - title
+      - artist
+      - reason
+      - status
+      - fulfilledBy
+      - fulfilledByName
+      - responseNote
+      - resources
+      - createdAt
+      - updatedAt
+      properties:
+        wishID:
+          $ref: '#/components/schemas/Identifier'
+        roomID:
+          $ref: '#/components/schemas/Identifier'
+        authorUsername:
+          type: string
+        authorDisplayName:
+          type: string
+        kind:
+          type: string
+          enum:
+          - track
+          - album
+          - artist
+        title:
+          type: string
+        artist:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - fulfilled
+        fulfilledBy:
+          type: string
+        fulfilledByName:
+          type: string
+        responseNote:
+          type: string
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/WishResource'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    WishList:
+      type: object
+      required:
+      - wishes
+      properties:
+        wishes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Wish'
+    MediaStat:
+      type: object
+      required:
+      - id
+      - name
+      - artist
+      - count
+      - seconds
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        artist:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        seconds:
+          type: number
+          minimum: 0
+    HourStat:
+      type: object
+      required:
+      - hour
+      - count
+      - seconds
+      properties:
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        count:
+          type: integer
+          minimum: 0
+        seconds:
+          type: number
+          minimum: 0
+    RoomStatistics:
+      type: object
+      required:
+      - period
+      - totalPlayCount
+      - totalPlayedSeconds
+      - totalChatCount
+      - activeMemberCount
+      - topArtists
+      - topAlbums
+      - topTracks
+      - hourlyDistribution
+      properties:
+        period:
+          type: string
+          enum:
+          - all
+          - year
+          - month
+          - week
+          - day
+          default: all
+        totalPlayCount:
+          type: integer
+          minimum: 0
+        totalPlayedSeconds:
+          type: number
+          minimum: 0
+        totalChatCount:
+          type: integer
+          minimum: 0
+        activeMemberCount:
+          type: integer
+          minimum: 0
+        topArtists:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaStat'
+        topAlbums:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaStat'
+        topTracks:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaStat'
+        hourlyDistribution:
+          type: array
+          items:
+            $ref: '#/components/schemas/HourStat'
+          minItems: 24
+          maxItems: 24
+    MemberRank:
+      type: object
+      required:
+      - username
+      - displayName
+      - count
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+    RoomRankings:
+      type: object
+      required:
+      - period
+      - requested
+      - listened
+      - chat
+      - topArtists
+      - topAlbums
+      - topTracks
+      properties:
+        period:
+          type: string
+          enum:
+          - all
+          - year
+          - month
+          - week
+          - day
+          default: all
+        requested:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberRank'
+        listened:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberRank'
+        chat:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberRank'
+        topArtists:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaStat'
+        topAlbums:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaStat'
+        topTracks:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaStat'
+    MemberStats:
+      type: object
+      required:
+      - staySeconds
+      - requestedCount
+      - listenedCount
+      - chatCount
+      properties:
+        staySeconds:
+          type: number
+          minimum: 0
+        requestedCount:
+          type: integer
+          minimum: 0
+        listenedCount:
+          type: integer
+          minimum: 0
+        chatCount:
+          type: integer
+          minimum: 0
+    MemberLevel:
+      type: object
+      required:
+      - level
+      - code
+      - effectiveMinutes
+      - currentThresholdMinutes
+      - nextThresholdMinutes
+      - progress
+      properties:
+        level:
+          type: integer
+          minimum: 1
+          maximum: 10
+        code:
+          type: string
+          pattern: ^level_([1-9]|10)$
+        effectiveMinutes:
+          type: number
+          minimum: 0
+        currentThresholdMinutes:
+          type: number
+          minimum: 0
+        nextThresholdMinutes:
+          type: number
+          minimum: 0
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+      description: 'Effective minutes = staySeconds/60 + listenedCount*5 + requestedCount*3 + chatCount. Thresholds:
+        0, 60, 180, 420, 900, 1800, 3600, 7200, 14400, 28800. At level 10, both thresholds are 28800 and progress is
+        1.'
+    Badge:
+      type: object
+      required:
+      - badgeID
+      - code
+      - kind
+      - subject
+      - tier
+      - count
+      - target
+      - unlocked
+      - unlockedAt
+      properties:
+        badgeID:
+          type: string
+        code:
+          type: string
+        kind:
+          type: string
+          enum:
+          - requested
+          - listened
+          - chat
+          - artist
+          - album
+        subject:
+          type: string
+        tier:
+          type: integer
+          minimum: 1
+        count:
+          type: integer
+          minimum: 0
+        target:
+          type: integer
+          minimum: 1
+        unlocked:
+          type: boolean
+        unlockedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    MemberProfile:
+      type: object
+      required:
+      - username
+      - displayName
+      - role
+      - online
+      - joinedAt
+      - lastSeenAt
+      - stats
+      - level
+      - selectedBadgeID
+      - badges
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          enum:
+          - owner
+          - member
+        online:
+          type: boolean
+        joinedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        stats:
+          $ref: '#/components/schemas/MemberStats'
+        level:
+          $ref: '#/components/schemas/MemberLevel'
+        selectedBadgeID:
+          type: string
+        badges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Badge'
+    BadgeSelection:
+      type: object
+      required:
+      - badgeID
+      properties:
+        badgeID:
+          type: string
+      additionalProperties: false
+    Event:
+      type: object
+      required:
+      - type
+      - roomID
+      - serverTime
+      - payload
+      properties:
+        type:
+          type: string
+          enum:
+          - snapshot
+          - playback
+          - queue
+          - history
+          - presence
+          - room_updated
+          - chat_message
+          - chat_updated
+          - wish_updated
+          - wish_deleted
+          - update_available
+          - pong
+          - error
+        roomID:
+          $ref: '#/components/schemas/Identifier'
+        serverTime:
+          type: string
+          format: date-time
+        revision:
+          type: integer
+          minimum: 0
+        payload:
+          anyOf:
+          - $ref: '#/components/schemas/Snapshot'
+          - $ref: '#/components/schemas/Playback'
+          - $ref: '#/components/schemas/ChatMessage'
+          - $ref: '#/components/schemas/Wish'
+          - $ref: '#/components/schemas/UpdateNotice'
+          - type: array
+            items: {}
+          - type: object
+            description: Presence, room, deletion, pong, or error payload.
+    PluginSync:
+      type: object
+      required: [pluginVersion, generation, navidromeInternalURL, users]
+      properties:
+        pluginVersion: { type: string, minLength: 1 }
+        generation: { type: integer, minimum: 1 }
+        navidromeInternalURL: { type: string, format: uri }
+        navidromePublicURL: { type: string, format: uri }
+        gatewayPublicURL: { type: string, format: uri }
+        updateChannel: { type: string, enum: [stable, beta], default: stable }
+        sentAt: { type: string, format: date-time }
+        users:
+          type: array
+          maxItems: 10000
+          items:
+            type: object
+            required: [username, displayName, admin]
+            properties:
+              username: { type: string, minLength: 1, maxLength: 128 }
+              displayName: { type: string }
+              admin: { type: boolean }
+    PluginSyncResponse:
+      type: object
+      required: [acceptedGeneration, leaseExpiresAt, gatewayVersion, updateAvailable, latestVersion, releaseURL]
+      properties:
+        acceptedGeneration: { type: integer }
+        leaseExpiresAt: { type: string, format: date-time }
+        gatewayVersion: { type: string }
+        updateAvailable: { type: boolean }
+        latestVersion: { type: string }
+        releaseURL: { type: string }

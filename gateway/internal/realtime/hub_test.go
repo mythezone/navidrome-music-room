@@ -47,3 +47,19 @@ func TestEmptyRoomPauseRunsOnce(t *testing.T) {
 	case <-time.After(30 * time.Millisecond):
 	}
 }
+
+func TestAllRoomsOnlineUsersDeduplicatesAndReturnsCopy(t *testing.T) {
+	hub := NewHub(time.Second, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	hub.add("one", &client{username: "alice"})
+	hub.add("one", &client{username: "ALICE"})
+	hub.add("one", &client{username: "bob"})
+	hub.add("two", &client{username: "alice"})
+	rooms := hub.AllRoomsOnlineUsers()
+	if len(rooms) != 2 || len(rooms["one"]) != 2 || len(rooms["two"]) != 1 {
+		t.Fatalf("online users: %+v", rooms)
+	}
+	rooms["one"][0] = "changed"
+	if next := hub.AllRoomsOnlineUsers(); next["one"][0] == "changed" {
+		t.Fatal("caller mutated hub state")
+	}
+}

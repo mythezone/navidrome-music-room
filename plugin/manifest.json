@@ -1,7 +1,7 @@
 {
   "name": "Navidrome Music Room",
   "author": "MusicMate Contributors",
-  "version": "1.1.0-dev",
+  "version": "1.2.0",
   "description": "Create, share and join synchronized Web or MusicMate listening rooms. Open Website below to manage rooms and QR codes.",
   "website": "/music-room/admin/",
   "config": {

@@ -1,84 +1,116 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import CatalogPanel from './components/CatalogPanel.vue'
 import FavoritesPanel from './components/FavoritesPanel.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
-import ComingSoonPanel from './components/ComingSoonPanel.vue'
+import ChatPanel from './components/ChatPanel.vue'
 import NowPlaying from './components/NowPlaying.vue'
 import QueuePanel from './components/QueuePanel.vue'
 import RoomHeader from './components/RoomHeader.vue'
 import RoomLogin from './components/RoomLogin.vue'
 import ShareDialog from './components/ShareDialog.vue'
+import LanguageSelector from './components/LanguageSelector.vue'
+import RoomInfoDialog from './components/RoomInfoDialog.vue'
+import MemberProfileDialog from './components/MemberProfileDialog.vue'
 import { routeContext } from './lib/location'
+import { clamp } from './lib/sync'
+import { useI18n } from './lib/i18n'
 import { useRoomStore } from './stores/room'
 
 const store = useRoomStore()
+const { t, locale, errorText } = useI18n()
 const shareOpen = ref(false)
-type TabName = 'playing' | 'queue' | 'history' | 'catalog' | 'favorites' | 'chat'
-const tabs: ReadonlyArray<{ value: TabName; label: string; icon: string; planned?: boolean }> = [
-  { value: 'playing', label: '播放', icon: 'mdi-disc-player' },
-  { value: 'queue', label: '待播放', icon: 'mdi-playlist-music' },
-  { value: 'history', label: '历史', icon: 'mdi-history' },
-  { value: 'catalog', label: '点歌台', icon: 'mdi-magnify' },
-  { value: 'favorites', label: '收藏', icon: 'mdi-heart-outline' },
-  { value: 'chat', label: '群聊', icon: 'mdi-message-text-outline', planned: true },
-]
-
-const statusCopy = computed(() => {
-  if (store.phase === 'booting') return '正在读取房间链接'
-  if (store.phase === 'joining') return '正在验证成员资格并同步房间'
-  return '正在准备听歌房'
+const content = ref<HTMLElement>()
+const split = ref(40)
+try { const saved = Number(localStorage.getItem('nmr:split:v1')); if (saved) split.value = clamp(saved, 28, 60) } catch { /* Use the default layout. */ }
+const dragging = ref(false)
+const tabs = computed(() => [
+  { value: 'playing' as const, icon: 'mdi-disc-player' }, { value: 'queue' as const, icon: 'mdi-playlist-music' },
+  { value: 'history' as const, icon: 'mdi-history' }, { value: 'catalog' as const, icon: 'mdi-magnify' },
+  { value: 'favorites' as const, icon: 'mdi-heart-outline' }, { value: 'chat' as const, icon: 'mdi-message-text-outline' },
+])
+watchEffect(() => {
+  document.title = `${store.room?.name ? `${store.room.name} · ` : ''}${t('appTitle')} · Navidrome`
+  document.documentElement.lang = locale.value
 })
-
+function updateChatVisibility(): void { store.chatVisible = store.activeTab === 'chat' && !store.immersive && document.visibilityState !== 'hidden' }
+watch(() => [store.activeTab, store.immersive], updateChatVisibility, { immediate: true })
+function persistSplit(): void { try { localStorage.setItem('nmr:split:v1', String(split.value)) } catch { /* Keep the layout in memory. */ } }
+function moveSplit(event: PointerEvent): void {
+  if (!dragging.value || !content.value) return
+  const rect = content.value.getBoundingClientRect()
+  split.value = clamp((event.clientX - rect.left) / rect.width * 100, 28, 60)
+}
+function startSplit(event: PointerEvent): void {
+  if (event.button !== 0) return
+  dragging.value = true
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
+function endSplit(): void { if (dragging.value) { dragging.value = false; persistSplit() } }
+function keySplit(event: KeyboardEvent): void {
+  const values: Record<string, number> = { ArrowLeft: split.value - 2, ArrowRight: split.value + 2, Home: 28, End: 60 }
+  if (event.key in values) { event.preventDefault(); split.value = clamp(values[event.key], 28, 60); persistSplit() }
+}
+watch(() => store.immersive, enabled => {
+  if (enabled) void document.documentElement.requestFullscreen?.().catch(() => {})
+  else if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {})
+})
+function fullscreenChanged(): void { if (!document.fullscreenElement) store.immersive = false }
+function escape(event: KeyboardEvent): void { if (event.key === 'Escape' && !document.querySelector('dialog[open]')) store.immersive = false }
 onMounted(() => {
   if (!window.matchMedia('(max-width: 820px)').matches) store.activeTab = 'queue'
-  const context = routeContext()
-  if (context) store.configure(context)
+  store.configure(routeContext())
   void store.start()
+  document.addEventListener('visibilitychange', updateChatVisibility)
+  document.addEventListener('fullscreenchange', fullscreenChanged)
+  document.addEventListener('keydown', escape)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', updateChatVisibility)
+  document.removeEventListener('fullscreenchange', fullscreenChanged)
+  document.removeEventListener('keydown', escape)
+  store.disconnect()
 })
 </script>
 
 <template>
   <RoomLogin v-if="store.phase === 'login'" />
-
   <main v-else-if="store.phase === 'error'" class="state-shell">
     <div class="state-card error-state">
-      <span class="state-icon"><i class="mdi mdi-link-variant-off" /></span>
-      <span class="section-kicker">{{ store.errorCode || 'ROOM_UNAVAILABLE' }}</span>
-      <h1>暂时无法进入这个房间</h1>
-      <p>{{ store.error }}</p>
-      <a class="primary-button" href="/app/">返回 Navidrome</a>
+      <LanguageSelector />
+      <span class="state-icon"><i aria-hidden="true" class="mdi mdi-link-variant-off" /></span>
+      <h1>{{ t('unavailable') }}</h1><p>{{ errorText(store.errorCode) }}</p>
+      <div class="toolbar"><button class="secondary-button" @click="store.start">{{ t('retry') }}</button><a class="primary-button" href="/app/">{{ t('backNavidrome') }}</a></div>
     </div>
   </main>
-
   <main v-else-if="store.phase !== 'ready'" class="state-shell">
-    <div class="state-card loading-state"><span class="room-mark pulse"><i class="mdi mdi-headphones" /></span><h1>{{ statusCopy }}</h1><p>登录信息和邀请码不会写入房间数据文件。</p><span class="spinner large" /></div>
+    <div class="state-card loading-state"><LanguageSelector /><span class="room-mark pulse"><i aria-hidden="true" class="mdi mdi-headphones" /></span><h1>{{ t(store.phase === 'joining' ? 'joining' : 'loading') }}</h1><span class="spinner large" /></div>
   </main>
-
-  <div v-else class="room-shell" :data-connected="store.connected" :data-reconnecting="store.reconnecting" :data-revision="store.playback?.revision || 0">
-    <RoomHeader @share="shareOpen = true" />
-    <div v-if="store.reconnecting" class="connection-banner"><span class="spinner" /> 网络已中断，正在恢复快照和实时连接…</div>
-    <div v-if="store.error" class="toast error-toast" role="alert"><i class="mdi mdi-alert-circle-outline" /> {{ store.error }}</div>
-    <div v-if="store.notice" class="toast notice-toast" role="status"><i class="mdi mdi-check-circle-outline" /> {{ store.notice }}</div>
-
-    <main class="room-content">
-      <div class="desktop-player"><NowPlaying /></div>
-      <section class="workspace">
-        <nav class="desktop-tabs" aria-label="房间功能">
-          <button v-for="tab in tabs.filter((item) => item.value !== 'playing')" :key="tab.value" :class="{ active: store.activeTab === tab.value }" @click="store.activeTab = tab.value"><i :class="`mdi ${tab.icon}`" />{{ tab.label }}<i v-if="tab.planned" class="mdi mdi-progress-wrench mini-planned" /></button>
+  <div v-else :class="['room-shell', { immersive: store.immersive }]" :data-connected="store.connected" :data-reconnecting="store.reconnecting" :data-revision="store.playback?.revision || 0">
+    <RoomHeader v-if="!store.immersive" @share="shareOpen = true" />
+    <div v-if="store.reconnecting" class="connection-banner" role="status"><span class="spinner" />{{ t('reconnecting') }}</div>
+    <div v-if="store.error" class="toast error-toast" role="alert">{{ errorText(store.errorCode) }}</div>
+    <div v-if="store.notice" class="toast notice-toast" role="status">{{ store.notice }}</div>
+    <button v-if="store.immersive" class="secondary-button exit-immersive" @click="store.immersive = false"><i aria-hidden="true" class="mdi mdi-fullscreen-exit" />{{ t('exitImmersive') }}</button>
+    <main ref="content" class="room-content" :style="{ '--player-width': `${split}%` }">
+      <div :class="['player-pane', { 'mobile-active': store.activeTab === 'playing' }]"><NowPlaying /></div>
+      <div v-if="!store.immersive" class="split-divider" role="separator" tabindex="0" aria-orientation="vertical" :aria-label="t('resize')" :aria-valuenow="Math.round(split)" :aria-valuemin="28" :aria-valuemax="60" @pointerdown="startSplit" @pointermove="moveSplit" @pointerup="endSplit" @pointercancel="endSplit" @lostpointercapture="endSplit" @keydown="keySplit" />
+      <section v-if="!store.immersive" :class="['workspace', { 'mobile-hidden': store.activeTab === 'playing' }]">
+        <nav class="desktop-tabs" :aria-label="t('appTitle')">
+          <button v-for="tab in tabs.filter(item => item.value !== 'playing')" :key="tab.value" :class="{ active: store.activeTab === tab.value }" :aria-pressed="store.activeTab === tab.value" @click="store.activeTab = tab.value"><i aria-hidden="true" :class="`mdi ${tab.icon}`" />{{ t(tab.value) }}<span v-if="tab.value === 'chat' && store.unreadChatCount" class="unread-badge">{{ store.unreadChatCount }}</span></button>
         </nav>
-        <div class="mobile-player" v-if="store.activeTab === 'playing'"><NowPlaying /></div>
-        <QueuePanel v-else-if="store.activeTab === 'queue'" />
+        <QueuePanel v-if="store.activeTab === 'queue' || store.activeTab === 'playing'" />
         <HistoryPanel v-else-if="store.activeTab === 'history'" />
         <CatalogPanel v-else-if="store.activeTab === 'catalog'" />
         <FavoritesPanel v-else-if="store.activeTab === 'favorites'" />
-        <ComingSoonPanel v-else feature="群聊" />
+        <ChatPanel v-else-if="store.activeTab === 'chat'" />
       </section>
     </main>
-
-    <nav class="mobile-tabs" aria-label="房间功能">
-      <button v-for="tab in tabs" :key="tab.value" :class="{ active: store.activeTab === tab.value }" @click="store.activeTab = tab.value"><span class="nav-icon"><i :class="`mdi ${tab.icon}`" /><i v-if="tab.planned" class="mdi mdi-progress-wrench mini-planned" /></span><span>{{ tab.label }}</span></button>
+    <nav v-if="!store.immersive" class="mobile-tabs" :aria-label="t('appTitle')">
+      <button v-for="tab in tabs" :key="tab.value" :class="{ active: store.activeTab === tab.value }" :aria-pressed="store.activeTab === tab.value" @click="store.activeTab = tab.value"><span class="nav-icon"><i aria-hidden="true" :class="`mdi ${tab.icon}`" /><span v-if="tab.value === 'chat' && store.unreadChatCount" class="unread-badge">{{ store.unreadChatCount }}</span></span><span>{{ t(tab.value) }}</span></button>
     </nav>
     <ShareDialog :open="shareOpen" @close="shareOpen = false" />
+    <RoomInfoDialog />
+    <MemberProfileDialog />
   </div>
 </template>

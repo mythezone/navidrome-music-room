@@ -9,6 +9,7 @@ import (
 )
 
 type createRoomRequest struct {
+	AllowMemberSkip  *bool  `json:"allowMemberSkip,omitempty"`
 	Name             string `json:"name"`
 	QueueLimit       int    `json:"queueLimit"`
 	PlaybackMode     string `json:"playbackMode"`
@@ -17,6 +18,7 @@ type createRoomRequest struct {
 }
 
 type patchRoomRequest struct {
+	AllowMemberSkip  *bool   `json:"allowMemberSkip,omitempty"`
 	Name             *string `json:"name,omitempty"`
 	QueueLimit       *int    `json:"queueLimit,omitempty"`
 	PlaybackMode     *string `json:"playbackMode,omitempty"`
@@ -89,13 +91,17 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	allowSkip := true
+	if input.AllowMemberSkip != nil {
+		allowSkip = *input.AllowMemberSkip
+	}
 	preload := true
 	if input.PreloadNextTrack != nil {
 		preload = *input.PreloadNextTrack
 	}
 	room, err := s.store.CreateRoom(r.Context(), domain.Room{
 		RoomID: roomID, Name: name, OwnerUsername: session.User.Username, OwnerDisplayName: session.User.DisplayName,
-		QueueLimit: input.QueueLimit, PlaybackMode: input.PlaybackMode, MusicFolderIDs: folders, PreloadNextTrack: preload,
+		QueueLimit: input.QueueLimit, PlaybackMode: input.PlaybackMode, MusicFolderIDs: folders, PreloadNextTrack: preload, AllowMemberSkip: allowSkip,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -157,6 +163,9 @@ func (s *Server) patchRoom(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		room.MusicFolderIDs = folders
+	}
+	if input.AllowMemberSkip != nil {
+		room.AllowMemberSkip = *input.AllowMemberSkip
 	}
 	if input.PreloadNextTrack != nil {
 		room.PreloadNextTrack = *input.PreloadNextTrack

@@ -53,6 +53,7 @@ type Asset struct {
 }
 
 type Release struct {
+	Body        string  `json:"body"`
 	TagName     string  `json:"tag_name"`
 	HTMLURL     string  `json:"html_url"`
 	PublishedAt string  `json:"published_at"`
@@ -62,6 +63,9 @@ type Release struct {
 }
 
 type Status struct {
+	PublishedAt       string    `json:"publishedAt,omitempty"`
+	Prerelease        bool      `json:"prerelease"`
+	ReleaseNotes      string    `json:"releaseNotes,omitempty"`
 	CurrentVersion    string    `json:"currentVersion"`
 	Channel           string    `json:"channel"`
 	LatestVersion     string    `json:"latestVersion,omitempty"`
@@ -117,6 +121,10 @@ func (m *Manager) Status(ctx context.Context, channel string) Status {
 	channel = normalizeChannel(channel)
 	status := Status{CurrentVersion: m.config.CurrentVersion, Channel: channel, State: "idle"}
 	_, _ = m.store.GetUpdateState(ctx, "status", &status)
+	if status.Channel != channel {
+		status = Status{Channel: channel, State: "idle"}
+	}
+	status.UpdateAvailable = isNewerVersion(status.LatestVersion, m.config.CurrentVersion)
 	status.CurrentVersion = m.config.CurrentVersion
 	status.Channel = channel
 	return m.withRollback(status)
@@ -136,8 +144,9 @@ func (m *Manager) Check(ctx context.Context, channel string) (Status, error) {
 	}
 	status := Status{
 		CurrentVersion: m.config.CurrentVersion, Channel: channel, LatestVersion: release.TagName,
-		UpdateAvailable: normalizeVersion(release.TagName) != normalizeVersion(m.config.CurrentVersion),
-		ReleaseURL:      release.HTMLURL, CheckedAt: time.Now().UTC(), State: "checked",
+		UpdateAvailable: isNewerVersion(release.TagName, m.config.CurrentVersion),
+		PublishedAt:     release.PublishedAt, Prerelease: release.Prerelease, ReleaseNotes: releaseNotes(release.Body),
+		ReleaseURL: release.HTMLURL, CheckedAt: time.Now().UTC(), State: "checked",
 	}
 	status = m.withRollback(status)
 	_ = m.store.PutUpdateState(ctx, "status", status)
@@ -311,7 +320,8 @@ func (m *Manager) Stage(ctx context.Context, requestedVersion, channel string) (
 	}
 	status := Status{
 		CurrentVersion: m.config.CurrentVersion, Channel: channel, LatestVersion: release.TagName,
-		UpdateAvailable: true, ReleaseURL: release.HTMLURL, CheckedAt: time.Now().UTC(),
+		PublishedAt: release.PublishedAt, Prerelease: release.Prerelease, ReleaseNotes: releaseNotes(release.Body),
+		UpdateAvailable: isNewerVersion(release.TagName, m.config.CurrentVersion), ReleaseURL: release.HTMLURL, CheckedAt: time.Now().UTC(),
 		StagedVersion: release.TagName, State: "staged",
 	}
 	status = m.withRollback(status)
@@ -737,4 +747,86 @@ func sanitizeDiagnostic(value string) string {
 		return value[:500]
 	}
 	return value
+}
+
+func releaseNotes(body string) string {
+	runes := []rune(strings.TrimSpace(body))
+	if len(runes) > 4000 {
+		runes = runes[:4000]
+	}
+	return strings.TrimSpace(string(runes))
+}
+
+var semverPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
+
+func isNewerVersion(latest, current string) bool {
+	latest, current = normalizeVersion(latest), normalizeVersion(current)
+	if latest == "" {
+		return false
+	}
+	if current == "dev" || current == "bootstrap" {
+		return true
+	}
+	a, b := semverPattern.FindStringSubmatch(latest), semverPattern.FindStringSubmatch(current)
+	if a == nil || b == nil {
+		return false
+	}
+	for _, version := range [][]string{a, b} {
+		for _, part := range strings.Split(version[4], ".") {
+			if numericIdentifier(part) && len(part) > 1 && part[0] == '0' {
+				return false
+			}
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		if a[i] != b[i] {
+			return compareNumeric(a[i], b[i]) > 0
+		}
+	}
+	if a[4] == b[4] {
+		return false
+	}
+	if a[4] == "" {
+		return true
+	}
+	if b[4] == "" {
+		return false
+	}
+	left, right := strings.Split(a[4], "."), strings.Split(b[4], ".")
+	for i := 0; i < len(left) && i < len(right); i++ {
+		if left[i] == right[i] {
+			continue
+		}
+		x, y := numericIdentifier(left[i]), numericIdentifier(right[i])
+		if x && y {
+			return compareNumeric(left[i], right[i]) > 0
+		}
+		if x != y {
+			return !x
+		}
+		return left[i] > right[i]
+	}
+	return len(left) > len(right)
+}
+
+func numericIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, c := range value {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func compareNumeric(a, b string) int {
+	if len(a) < len(b) {
+		return -1
+	}
+	if len(a) > len(b) {
+		return 1
+	}
+	return strings.Compare(a, b)
 }

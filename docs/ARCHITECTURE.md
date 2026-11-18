@@ -21,7 +21,11 @@ user's raw password. The room client owns exactly one audio element and controls
 it from the server's revisioned clock. Share QR codes are rendered locally; invite fragments are
 not sent to another QR service.
 
-The gateway owns room coordination only. It stores rooms, persistent membership, invitation digests, queue, playback history, security audit records, migration state, and updater state. It does not store Navidrome passwords, OpenSubsonic proofs, permanent stream URLs, or audio bodies.
+The gateway owns room coordination only. It stores rooms, persistent membership,
+invitation digests, queue, playback history, chat, wishes, member counters and badge
+selection, security audit records, migration state, and updater state. It does not
+persist Navidrome passwords, OpenSubsonic proofs, permanent stream URLs, or audio
+bodies.
 
 The Web room and MusicMate own playback. Both use the listener's Navidrome
 account for `search3`, `getAlbum`, `getSong`, `getCoverArt`,
@@ -51,6 +55,42 @@ Mutations require `expectedRevision`. A stale request receives `409 revision_con
 
 Queue selection prevents one contributor from monopolizing playback. FIFO chooses the oldest entry from another contributor when possible. Fair-random chooses a contributor first and then one of that contributor's tracks. The personal pending limit is stored per room.
 
+Owners and Navidrome administrators control shared play/pause/seek and `previous`.
+`next` also accepts any member when `allowMemberSkip` is enabled (the default), or
+the contributor of the current track when it is disabled. Contributor permission
+is tied to the same playback revision checked by the mutation. Snapshots expose
+`canControl`, `canSkip`, `canReorderQueue`, and `canFulfillWish` separately. Member
+play/pause otherwise remains local to that browser.
+
+Managers can reorder, pin, and shuffle the pending queue; shuffle preserves the
+first pending entry. History supports bounded `limit`/`offset` pagination and
+re-queue through the usual track-access and queue-limit checks. Browser audio
+still streams directly from Navidrome, including the optional five-band Web Audio
+EQ; mobile devices bypass the EQ graph for native background playback.
+
+## Community and localization
+
+The Web room and Admin Console share seven supported locales (`en`, `zh-CN`,
+`zh-TW`, `ja`, `es`, `fr`, `de`). Detection prefers the saved `nmr:locale`, then
+Navidrome's `i18nextLng`/`locale`, then browser languages, falling back to English.
+Clients translate stable API error codes and retain language choices locally.
+
+Chat is room-scoped and delivered through WebSocket events with paginated REST
+history. Messages support member mentions, validated library references, reviews,
+reply previews, and two localized built-in sticker packs. Senders can recall
+within five minutes; managers can delete messages. Recall/deletion leaves a
+tombstone and clears message content, including reply previews of that content.
+Wishes describe tracks, albums, or artists; managers fulfill them with response
+notes and resource links.
+
+Statistics and leaderboards derive from playback history, chat, and audit records
+for UTC calendar periods `day`, `week` (Monday start), `month`, `year`, or `all`.
+The listening clock groups activity by UTC hour. `member_stats` holds accumulated
+room presence, requested/listened/chat counts, and the selected badge. Presence is
+counted once per connected username per room, even with multiple sockets. Ten
+levels combine presence minutes and participation counters; badges and unlock
+times are derived from those counters and supporting history/audit records.
+
 ## Persistence
 
 SQLite lives below the plugin folder but does not share Navidrome's schema. WAL, foreign keys, one writer lock for compound mutations, and transactional migrations are enabled. Current tables are:
@@ -60,12 +100,17 @@ SQLite lives below the plugin folder but does not share Navidrome's schema. WAL,
 - `invites`
 - `queue`
 - `playback_history`
+- `chat_messages`
+- `room_wishes`
+- `member_stats`
 - `security_audit`
 - `plugin_state`
 - `update_state`
 - `schema_migrations`
 
-There are intentionally no chat, statistics, ranking, level, or achievement tables until those open-source roadmap features are implemented.
+Migration v5 adds `rooms.allow_member_skip` (default `1`) and the three community
+tables. Statistics, rankings, levels, and achievements are computed from the
+stored records rather than duplicated in separate tables.
 
 ## Deployment model
 
@@ -76,4 +121,9 @@ with the management console, and a single TLS certificate protects both.
 The edge access-log format intentionally omits query strings because
 OpenSubsonic proofs are query parameters.
 
-v1 supports one gateway process. The launcher supervises that process and owns atomic release switching. Redis, distributed locks, cloud relays, and multi-node consensus are intentionally absent.
+v1.2 supports one gateway process. The launcher supervises that process and owns
+atomic signed-release switching and database rollback. The Admin Web UI coordinates
+Navidrome rescan/re-enable over the shared origin. Scheduled release checks send
+admin-only WebSocket notices, optional webhooks, and plugin-sync metadata for
+Navidrome heartbeat logs; see [UPDATES.md](UPDATES.md). Redis, distributed locks,
+cloud relays, and multi-node consensus are intentionally absent.

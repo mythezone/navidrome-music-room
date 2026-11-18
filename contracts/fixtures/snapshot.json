@@ -7,14 +7,16 @@
     "status": "open",
     "queueLimit": 20,
     "playbackMode": "fifo",
-    "musicFolderIDs": [1],
+    "musicFolderIDs": [
+      1
+    ],
     "preloadNextTrack": true,
     "capabilities": {
-      "chat": false,
-      "stickers": false,
-      "statistics": false,
-      "rankings": false,
-      "achievements": false,
+      "chat": true,
+      "stickers": true,
+      "statistics": true,
+      "rankings": true,
+      "achievements": true,
       "uploads": false,
       "onlineSources": false,
       "invites": true,
@@ -23,7 +25,8 @@
     },
     "onlineCount": 1,
     "createdAt": "2026-09-01T10:00:00Z",
-    "updatedAt": "2026-09-01T10:00:00Z"
+    "updatedAt": "2026-09-01T10:00:00Z",
+    "allowMemberSkip": true
   },
   "self": {
     "username": "listener",
@@ -57,5 +60,12 @@
     "contributorDisplayName": "Listener"
   },
   "history": [],
-  "generatedAt": "2026-09-01T10:03:00Z"
+  "generatedAt": "2026-09-01T10:03:00Z",
+  "permissions": {
+    "canManage": false,
+    "canControl": false,
+    "canSkip": true,
+    "canReorderQueue": false,
+    "canFulfillWish": false
+  }
 }

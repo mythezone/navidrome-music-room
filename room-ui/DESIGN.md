@@ -1,5 +1,7 @@
 # Music Room Web design contract
 
+This document describes the v1.2 room UI.
+
 The existing FAIO room screen is the product reference. The generated desktop
 concept used during the 1.0 implementation lives at:
 
@@ -19,30 +21,60 @@ browser suite. Neither bitmap is shipped as application UI.
 
 ## Information architecture
 
-- Desktop: compact room bar, left now-playing surface, right tabbed work area.
+- Desktop: compact room bar, left now-playing surface, resizable divider, and right
+  tabbed work area. The divider supports pointer and keyboard adjustment and
+  persists the chosen width.
 - Mobile: compact room bar, one content surface, fixed six-item bottom navigation.
-- Tabs: 播放, 待播放, 历史, 点歌台, 收藏, 群聊. 群聊 is marked as an
-  open-source roadmap item until its implementation lands.
-- The initial browser media gesture is labelled 开始收听. It is not shown once
+- Tabs: Player, Queue, History, Request music, Favorites, and Chat, translated in
+  the selected language. Chat is live and displays an unread count when hidden.
+- The initial browser media gesture is labelled Start listening. It is not shown once
   the browser has granted playback.
-- Admin/owner controls affect the room. Member playback controls affect only the
-  local listener, matching the native MusicMate permission model.
+- Admin/owner play, pause, seek, and previous-track controls affect the room.
+  Member play/pause affects local listening. Next-track uses `canSkip`: managers,
+  any member when `allowMemberSkip` is on, or the current track's contributor.
+- Clicking artwork opens an immersive fullscreen layout. Lyrics follow the
+  current LRC line and can expand into a lyrics-focused view; Escape exits the
+  immersive view. A five-band EQ offers presets and custom gains on supported
+  desktop browsers; mobile devices use native audio without the Web Audio graph.
+- Room Information contains members, statistics/period leaderboards, the activity
+  clock, and wishes. Member profiles show ten levels, progress, and badges.
+
+## Localization
+
+All controls, dialogs, errors, quick reviews, and built-in sticker labels support
+`en`, `zh-CN`, `zh-TW`, `ja`, `es`, `fr`, and `de`. `lib/i18n.ts` detects the saved
+`nmr:locale`, Navidrome's `i18nextLng`/`locale`, then browser preferences. The
+language selector is available at login and in the room header and persists its
+choice in `nmr:locale`. API error codes are translated with a safe generic fallback.
 
 ## Component inventory
 
 - `RoomLogin`: existing-session reuse and same-origin Navidrome login.
-- `RoomHeader`: room identity, presence, connection, share, and MusicMate escape.
-- `NowPlaying`: artwork, metadata, synchronized timeline, transport, lyrics.
-- `QueuePanel`: pending items, own-item removal, manager reorder.
-- `HistoryPanel`: server playback history.
+- `RoomHeader`: room identity, presence, connection, language, information,
+  settings, share, MusicMate escape, and administrator update badge.
+- `NowPlaying`: immersive artwork, linked metadata, synchronized timeline,
+  permission-aware transport, auto-scrolling/expandable lyrics, and EQ.
+- `QueuePanel`: pending items, own-item removal, manager drag reorder, Pin-to-Top,
+  Shuffle Queue, and Random Fill.
+- `HistoryPanel`: paginated server playback history with one-click re-queue.
 - `CatalogPanel`: OpenSubsonic search, albums, songs, artists, and queue actions.
-- `FavoritesPanel`: the signed-in Navidrome user's starred songs and playlists.
-- `ComingSoonPanel`: honest open-source roadmap state with contribution copy.
+- `FavoritesPanel`: Songs, Albums, Artists, and Playlists from the listener's account.
+- `ChatPanel`: live messages, keyboard-accessible member/song suggestions, library
+  cards, localized quick reviews, replies, five-minute recall, manager deletion,
+  and the two-pack sticker picker.
+- `RoomInfoDialog`: member list, statistics, five leaderboard periods, 24-hour
+  activity clock, and wishes with manager fulfillment/resource selection.
+- `MemberProfileDialog`: participation counters, level progress, achievements,
+  and selection of an unlocked badge.
+- `RoomSettingsDialog`: manager-editable room settings, including member skip.
+- `RoomDialog` and `ShareDialog`: shared accessible modal behavior and invitations.
+- `LanguageSelector`, `SongList`, `TrackActions`, and `TrackLinks`: shared language,
+  library-list, queue/chat action, and artist/album navigation controls.
 
 The screen must not add marketing copy, analytics, unrelated navigation, or a
 second Navidrome shell.
 
-## v1.1 fidelity ledger
+## v1.2 fidelity ledger
 
 Compared after the live browser run against both reference images:
 
@@ -55,13 +87,16 @@ Compared after the live browser run against both reference images:
   transport. Typography, borders, radii, and muted metadata match the reference
   hierarchy without copying its unrelated FAIO navigation.
 - Intentional differences are the Navidrome room identity, MusicMate escape,
-  explicit browser-autoplay action, and visibly planned community features.
+  explicit browser-autoplay action, and the implemented community dialogs/chat.
   These correspond to real provider and permission behavior rather than
   decoration.
 
-The compared production captures are `docs/assets/web-room-live.png`,
+The historical v1.1 production captures are `docs/assets/web-room-live.png`,
 `docs/assets/web-room-catalog-live.png`, and `docs/assets/web-room-mobile.png`.
 They are generated by `e2e/live.mjs` from the running product, not assembled or
 rewritten after capture. Set `NMR_SCREENSHOT_QUERY`, `NMR_SCREENSHOT_TRACK`, and
 `NMR_SCREENSHOT_ROOM_NAME` to choose documentation data. The capture waits for
 all cover images and rejects excluded artist text before writing each PNG.
+The v1.2 `e2e/ui.mjs` suite exercises the production bundle with deterministic
+API fixtures, including languages, responsive layout, immersive mode, community
+flows, member/manager controls, and content-security-policy checks.

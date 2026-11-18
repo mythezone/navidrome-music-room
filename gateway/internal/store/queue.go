@@ -65,7 +65,8 @@ FROM queue WHERE room_id = ? AND queue_id = ?`, roomID, queueID))
 	return entry, err
 }
 
-// AddQueueEntry appends a requested track and, when the room is idle, promotes
+// AddQueueEntry inserts at the front when entry.Position is 1, otherwise appends,
+// and, when the room is idle, promotes
 // the first pending item to the paused current track in the same transaction.
 // This mirrors the FAIO room contract: clients always get a playable current
 // item after the first request, while only a room manager may start playback.
@@ -111,13 +112,24 @@ FROM queue WHERE room_id = ?`, entry.Contributor, room.RoomID).Scan(&ownCount, &
 		_ = tx.Rollback()
 		return domain.QueueEntry{}, nil, domain.NewError(409, "room_queue_full", "Room queue is full")
 	}
-	entry.Position = maxPosition + 1
+	if entry.Position == 1 {
+		if err = shiftQueueTx(ctx, tx, room.RoomID); err != nil {
+			tx.Rollback()
+			return domain.QueueEntry{}, nil, err
+		}
+	} else {
+		entry.Position = maxPosition + 1
+	}
 	entry.CreatedAt = time.Now().UTC()
 	if _, err = tx.ExecContext(ctx, `
 INSERT INTO queue(queue_id, room_id, position, track_json, contributor_username, contributor_display_name, created_unix_ms)
 VALUES (?, ?, ?, ?, ?, ?, ?)`, entry.QueueID, room.RoomID, entry.Position, string(trackJSON),
 		entry.Contributor, entry.ContributorName, unixMillis(entry.CreatedAt)); err != nil {
 		_ = tx.Rollback()
+		return domain.QueueEntry{}, nil, err
+	}
+	if err = incrementStatsTx(ctx, tx, room.RoomID, entry.Contributor, entry.ContributorName, domain.MemberStats{RequestedCount: 1}, entry.CreatedAt); err != nil {
+		tx.Rollback()
 		return domain.QueueEntry{}, nil, err
 	}
 	if err = insertAuditTx(ctx, tx, entry.Contributor, room.RoomID, "queue.added", map[string]string{
@@ -279,4 +291,13 @@ func normalizeQueueTx(ctx context.Context, tx *sql.Tx, roomID string) error {
 		}
 	}
 	return nil
+}
+
+// Negative positions avoid transient collisions with UNIQUE(room_id, position).
+func shiftQueueTx(ctx context.Context, tx *sql.Tx, roomID string) error {
+	if _, err := tx.ExecContext(ctx, "UPDATE queue SET position = -position WHERE room_id = ?", roomID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, "UPDATE queue SET position = -position + 1 WHERE room_id = ?", roomID)
+	return err
 }

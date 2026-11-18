@@ -1,0 +1,19 @@
+{
+  "messages": [
+    {
+      "messageID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+      "senderUsername": "listener",
+      "senderDisplayName": "Listener",
+      "messageType": "chat",
+      "body": "Great track!",
+      "stickerID": "vibes:music",
+      "replyToID": "",
+      "mentions": [],
+      "references": [],
+      "createdAt": "2026-11-18T10:00:00Z"
+    }
+  ],
+  "hasMore": false,
+  "nextBefore": ""
+}

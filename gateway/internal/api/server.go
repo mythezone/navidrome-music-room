@@ -36,6 +36,8 @@ type Server struct {
 	authLimiter     *rateLimiter
 	mutationLimiter *rateLimiter
 	inviteLimiter   *rateLimiter
+	chatLimiter     *rateLimiter
+	updateChecks    chan struct{}
 	idempotency     *idempotencyCache
 	updater         *updatemanager.Manager
 	restart         func()
@@ -53,6 +55,7 @@ func NewServer(cfg config.Config, storage *store.Store, sessions *auth.SessionMa
 		config: cfg, store: storage, sessions: sessions, tickets: realtime.NewTickets(cfg.WebSocketTicketTTL),
 		logger: logger, mux: http.NewServeMux(), authLimiter: newRateLimiter(10, time.Minute),
 		mutationLimiter: newRateLimiter(120, time.Minute), inviteLimiter: newRateLimiter(30, time.Minute),
+		chatLimiter: newRateLimiter(20, time.Minute), updateChecks: make(chan struct{}, 1),
 		idempotency: newIdempotencyCache(15*time.Minute, 2048), updater: updater,
 	}
 	server.hub = realtime.NewHub(cfg.EmptyRoomPauseDelay, server.pauseForEmpty, logger)
@@ -74,7 +77,11 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) routes() {
-	s.mux.Handle("GET /admin", adminui.Handler())
+	s.mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Location", "admin/")
+		w.WriteHeader(http.StatusPermanentRedirect)
+	})
 	s.mux.Handle("GET /admin/{path...}", adminui.Handler())
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /readyz", s.ready)
@@ -113,13 +120,23 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/admin/diagnostics", s.exportDiagnostics)
 	s.mux.HandleFunc("GET /api/v1/admin/updates", s.updateStatus)
 	s.mux.HandleFunc("POST /api/v1/admin/updates", s.updateAction)
-	for _, path := range []string{
-		"/api/v1/rooms/{room_id}/chat", "/api/v1/rooms/{room_id}/statistics",
-		"/api/v1/rooms/{room_id}/rankings", "/api/v1/rooms/{room_id}/achievements",
-		"/api/v1/rooms/{room_id}/stickers",
-	} {
-		s.mux.HandleFunc(path, s.unimplementedFeature)
-	}
+	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/queue/shuffle", s.shuffleQueue)
+	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/queue/{queue_id}/top", s.topQueue)
+	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/history/{history_id}/requeue", s.requeueHistory)
+	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/stickers", s.stickers)
+	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/chat", s.chat)
+	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/chat", s.postChat)
+	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/chat/{message_id}/recall", s.recallChat)
+	s.mux.HandleFunc("DELETE /api/v1/rooms/{room_id}/chat/{message_id}", s.deleteChat)
+	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/statistics", s.statistics)
+	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/rankings", s.rankings)
+	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/achievements", s.profile)
+	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/members/{username}/profile", s.profile)
+	s.mux.HandleFunc("PUT /api/v1/rooms/{room_id}/achievements/selected", s.selectBadge)
+	s.mux.HandleFunc("GET /api/v1/rooms/{room_id}/wishes", s.wishes)
+	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/wishes", s.postWish)
+	s.mux.HandleFunc("POST /api/v1/rooms/{room_id}/wishes/{wish_id}/fulfill", s.fulfillWish)
+	s.mux.HandleFunc("DELETE /api/v1/rooms/{room_id}/wishes/{wish_id}", s.deleteWish)
 }
 
 func (s *Server) RunClock(ctx context.Context) {
@@ -142,6 +159,7 @@ func (s *Server) RunClock(ctx context.Context) {
 			}
 		}
 	}
+	ticks := 0
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -149,13 +167,19 @@ func (s *Server) RunClock(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			ticks++
+			if ticks%15 == 0 {
+				if err := s.store.IncrementStay(ctx, s.hub.AllRoomsOnlineUsers(), 15); err != nil {
+					s.logger.Error("member stay accounting failed", "error", err)
+				}
+			}
 			roomIDs, err := s.store.ListPlayingRoomIDs(ctx)
 			if err != nil {
 				s.logger.Error("playback clock list failed", "error", err)
 				continue
 			}
 			for _, roomID := range roomIDs {
-				state, changed, err := s.store.AdvanceFinished(ctx, roomID)
+				state, changed, err := s.store.AdvanceFinished(ctx, roomID, s.hub.OnlineUsers(roomID))
 				if err != nil {
 					s.logger.Error("playback clock advance failed", "room_id", roomID, "error", err)
 					continue
@@ -379,22 +403,6 @@ func (s *Server) discovery(w http.ResponseWriter, _ *http.Request) {
 		"navidromeBaseURL":   s.config.NavidromePublic.String(),
 		"authenticationMode": "opensubsonic-proof-exchange",
 	})
-}
-
-func featureFromPath(path string) string {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 0 {
-		return "unknown"
-	}
-	return parts[len(parts)-1]
-}
-
-func (s *Server) unimplementedFeature(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := s.session(r); err != nil {
-		writeError(w, err)
-		return
-	}
-	writeError(w, domain.FeatureNotImplemented(featureFromPath(r.URL.Path)))
 }
 
 func (s *Server) redirectRoomUI(w http.ResponseWriter, r *http.Request) {

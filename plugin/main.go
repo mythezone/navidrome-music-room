@@ -150,7 +150,7 @@ func syncGateway() error {
 			if err := host.KVStoreSet(generationKey, []byte(strconv.FormatInt(generation, 10))); err != nil {
 				return fmt.Errorf("persist sync generation: %w", err)
 			}
-			return nil
+			return notifyUpdate(response.Body)
 		}
 		if current, ok := staleGeneration(response); ok && attempt == 0 && current >= generation && current < 1<<62 {
 			generation = current + 1
@@ -243,3 +243,29 @@ func configBool(key string, fallback bool) bool {
 }
 
 func main() {}
+
+func notifyUpdate(body []byte) error {
+	var response struct {
+		UpdateAvailable bool   `json:"updateAvailable"`
+		LatestVersion   string `json:"latestVersion"`
+		ReleaseURL      string `json:"releaseURL"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("decode gateway sync: %w", err)
+	}
+	if !response.UpdateAvailable || response.LatestVersion == "" {
+		return nil
+	}
+	previous, _, err := host.KVStoreGet("notified-update-version")
+	if err != nil {
+		return fmt.Errorf("read notified update: %w", err)
+	}
+	if string(previous) == response.LatestVersion {
+		return nil
+	}
+	pdk.Log(pdk.LogInfo, fmt.Sprintf("Navidrome Music Room update available: %s (%s). Open the plugin Website console to upgrade.", response.LatestVersion, response.ReleaseURL))
+	if err = host.KVStoreSet("notified-update-version", []byte(response.LatestVersion)); err != nil {
+		return fmt.Errorf("persist notified update: %w", err)
+	}
+	return nil
+}

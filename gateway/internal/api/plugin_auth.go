@@ -86,7 +86,15 @@ func (s *Server) pluginSync(w http.ResponseWriter, r *http.Request) {
 			s.hub.KickUserEverywhere(previousUser.Username)
 		}
 	}
+	if previous.UpdateChannel != "" && previous.UpdateChannel != state.UpdateChannel {
+		select {
+		case s.updateChecks <- struct{}{}:
+		default:
+		}
+	}
+	status := s.updater.Status(r.Context(), state.UpdateChannel)
 	writeJSON(w, 200, map[string]any{
+		"updateAvailable": status.UpdateAvailable, "latestVersion": status.LatestVersion, "releaseURL": status.ReleaseURL,
 		"acceptedGeneration": state.Generation,
 		"leaseExpiresAt":     state.LastHeartbeat.Add(s.config.PluginLease),
 		"gatewayVersion":     s.config.Version,
@@ -136,8 +144,8 @@ func (s *Server) featureAvailability(w http.ResponseWriter, r *http.Request) {
 		"project": map[string]any{"openSource": true, "spdxLicense": "GPL-3.0-only"},
 		"features": map[string]any{
 			"rooms": true, "invites": true, "presence": true, "synchronizedPlayback": true,
-			"queue": true, "history": true, "chat": false, "stickers": false,
-			"statistics": false, "rankings": false, "achievements": false, "uploads": false, "onlineSources": false,
+			"queue": true, "history": true, "chat": true, "stickers": true,
+			"statistics": true, "rankings": true, "achievements": true, "uploads": false, "onlineSources": false,
 		},
 	})
 }

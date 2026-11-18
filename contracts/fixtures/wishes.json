@@ -1,0 +1,21 @@
+{
+  "wishes": [
+    {
+      "wishID": "cccccccccccccccccccccccccccccccc",
+      "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+      "authorUsername": "listener",
+      "authorDisplayName": "Listener",
+      "kind": "album",
+      "title": "Example Album",
+      "artist": "Example Artist",
+      "reason": "For our next session",
+      "status": "pending",
+      "fulfilledBy": "",
+      "fulfilledByName": "",
+      "responseNote": "",
+      "resources": [],
+      "createdAt": "2026-11-18T10:00:00Z",
+      "updatedAt": "2026-11-18T10:00:00Z"
+    }
+  ]
+}

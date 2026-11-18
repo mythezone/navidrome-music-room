@@ -59,10 +59,11 @@ type RoomCapabilities struct {
 }
 
 func FreeCapabilities() RoomCapabilities {
-	return RoomCapabilities{Invites: true, Queue: true, History: true}
+	return RoomCapabilities{Chat: true, Stickers: true, Statistics: true, Rankings: true, Achievements: true, Invites: true, Queue: true, History: true, Uploads: false, OnlineSources: false}
 }
 
 type Room struct {
+	AllowMemberSkip  bool             `json:"allowMemberSkip"`
 	RoomID           string           `json:"roomID"`
 	Name             string           `json:"name"`
 	OwnerUsername    string           `json:"ownerUsername"`
@@ -150,13 +151,15 @@ type HistoryEntry struct {
 }
 
 type Snapshot struct {
-	Room        Room           `json:"room"`
-	Self        Member         `json:"self"`
-	Members     []Member       `json:"members"`
-	Queue       []QueueEntry   `json:"queue"`
-	Playback    PlaybackState  `json:"playback"`
-	History     []HistoryEntry `json:"history"`
-	GeneratedAt time.Time      `json:"generatedAt"`
+	Permissions  RoomPermissions `json:"permissions"`
+	UpdateNotice *UpdateNotice   `json:"updateNotice,omitempty"`
+	Room         Room            `json:"room"`
+	Self         Member          `json:"self"`
+	Members      []Member        `json:"members"`
+	Queue        []QueueEntry    `json:"queue"`
+	Playback     PlaybackState   `json:"playback"`
+	History      []HistoryEntry  `json:"history"`
+	GeneratedAt  time.Time       `json:"generatedAt"`
 }
 
 type PluginUser struct {
@@ -203,4 +206,19 @@ type Event struct {
 	Revision   int64     `json:"revision,omitempty"`
 	ServerTime time.Time `json:"serverTime"`
 	Payload    any       `json:"payload"`
+}
+
+type RoomPermissions struct {
+	CanManage       bool `json:"canManage"`
+	CanControl      bool `json:"canControl"`
+	CanSkip         bool `json:"canSkip"`
+	CanReorderQueue bool `json:"canReorderQueue"`
+	CanFulfillWish  bool `json:"canFulfillWish"`
+}
+
+type UpdateNotice struct {
+	CurrentVersion string `json:"currentVersion"`
+	LatestVersion  string `json:"latestVersion"`
+	Channel        string `json:"channel"`
+	ReleaseURL     string `json:"releaseURL,omitempty"`
 }

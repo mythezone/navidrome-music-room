@@ -41,3 +41,30 @@ describe('SubsonicClient catalog browsing', () => {
     expect(albumsURL?.searchParams.get('type')).toBe('newest')
   })
 })
+
+describe('new Subsonic helpers', () => {
+  afterEach(() => vi.restoreAllMocks())
+  it('requests bounded random songs from the selected library', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ 'subsonic-response': { status: 'ok', randomSongs: { song: [{ id: 'r', title: 'Random' }] } } }) } as Response)
+    const client = new SubsonicClient('https://music.test', { username: 'u', salt: 's', token: 't' })
+    expect((await client.randomSongs(9))[0].id).toBe('r')
+    let url = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(url.searchParams.get('size')).toBe('20')
+    expect(url.searchParams.get('musicFolderId')).toBe('9')
+    await client.randomSongs(7, 5)
+    url = new URL(String(fetchMock.mock.calls[1][0]))
+    expect(url.searchParams.get('size')).toBe('5')
+  })
+  it('provides typed song, album and artist search results and handles absent lists', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ 'subsonic-response': { status: 'ok', searchResult3: { song: [{ id: 's' }], album: [{ id: 'a' }], artist: [{ id: 'r' }] } } }) } as Response)
+    const client = new SubsonicClient('https://music.test', { username: 'u', salt: 's', token: 't' })
+    expect(await client.searchSongs('Night', 7)).toEqual([{ id: 's' }])
+    expect(await client.searchAlbums('Night', 7)).toEqual([{ id: 'a' }])
+    expect(await client.searchArtists('Night', 7)).toEqual([{ id: 'r' }])
+    for (const [input] of fetchMock.mock.calls) {
+      const url = new URL(String(input)); expect(url.searchParams.get('query')).toBe('Night'); expect(url.searchParams.get('musicFolderId')).toBe('7')
+    }
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ 'subsonic-response': { status: 'ok' } }) } as Response)
+    expect(await client.searchSongs('Missing', 7)).toEqual([])
+  })
+})

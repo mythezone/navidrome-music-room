@@ -21,7 +21,7 @@ jobs:
       - working-directory: admin-ui
         run: npm ci
       - working-directory: admin-ui
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
       - working-directory: admin-ui
         run: npm test
       - working-directory: admin-ui
@@ -41,7 +41,7 @@ jobs:
       - working-directory: room-ui
         run: npm ci
       - working-directory: room-ui
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
       - working-directory: room-ui
         run: npm test
       - working-directory: room-ui

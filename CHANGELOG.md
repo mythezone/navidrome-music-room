@@ -4,6 +4,61 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-18
+
+### Added
+
+- Seven-language internationalization (`en`, `zh-CN`, `zh-TW`, `ja`, `es`, `fr`,
+  `de`) in the Web Listening Room and Administrator Console, with automatic
+  Navidrome/browser locale detection, a persistent `nmr:locale` switcher, and
+  localized error codes.
+- Collaborative track skipping through per-room `allowMemberSkip`, enabled by
+  default and configurable in the Admin Console and in-room settings. Contributors
+  can skip their own current track even when member skipping is disabled; managers
+  can also use the `previous` track command.
+- Real-time Group Chat with `@member` and `@song` suggestions, playable track/album
+  references, localized quick track review presets, replies, five-minute sender
+  recall, manager deletion, unread tab badges, and two built-in localized
+  sticker/reaction packs.
+- A Room Information hub with Listening Statistics, period leaderboards
+  (`day`/`week`/`month`/`year`/`all`) for Top DJs, Listeners, Chatters, Artists,
+  Albums, and Tracks, and a 24-hour Listening Activity Clock. Member profiles
+  include ten progression levels and unlockable achievements/badges. Song Wishes
+  support a `pending`/`fulfilled` workflow with library resource attachments.
+- FAIO-style Music Room UI/UX improvements: a resizable desktop split layout,
+  click-artwork immersive fullscreen view with auto-scrolling expandable LRC
+  lyrics, and a five-band Web Audio equalizer, bypassed on mobile touch devices
+  to preserve native background audio. Queue controls include drag-and-drop
+  reordering, Pin-to-Top, Shuffle Queue, and Random Fill; history supports
+  pagination and one-click re-queue, and Favorites has Songs, Albums, Artists,
+  and Playlists tabs.
+- In-browser One-Click Signed Upgrade, Rollback, and redacted Diagnostics UI at
+  `/music-room/admin/`, coordinating same-origin Navidrome `/api/plugin/rescan`
+  and plugin re-enable automatically. Scheduled GitHub Release detection uses
+  `MUSIC_ROOM_AUTO_UPDATE_CHECK` and `MUSIC_ROOM_UPDATE_CHECK_INTERVAL`, with
+  admin-only WebSocket update badges, optional `MUSIC_ROOM_UPDATE_WEBHOOK_URL`
+  push, and `.ndp` heartbeat update logging.
+
+### Changed
+
+- Updated `/api/v1/capabilities` and the OpenAPI contract to `1.2.0`, enabling
+  `chat`, `stickers`, `statistics`, `rankings`, and `achievements` under GPL-3.0.
+- Advanced SQLite to migration v5 with `rooms.allow_member_skip`, `chat_messages`,
+  `room_wishes`, and `member_stats`.
+- Frontend audit gates now check runtime dependencies with `--omit=dev`;
+  the unpatched `GHSA-fc5q-39xc-vjpf` advisory remains in build/test dependencies.
+
+### Fixed
+
+- Fixed the unauthenticated Admin Console blank screen with the missing `LockIcon`
+  import and a React `ErrorBoundary` ([#8](https://github.com/mythezone/navidrome-music-room/issues/8)).
+  Added a prefix-preserving `308` redirect from `GET /admin` to `admin/`.
+- Replaced updater string inequality with SemVer comparison so older versions
+  and build-metadata-only changes are not offered as upgrades. Hardened version
+  stamping in `build-plugin.sh`, `package-release.sh`, and `Dockerfile` to replace
+  arbitrary existing version strings and normalize a leading `v`.
+- Refreshed frontend lockfiles and regenerated both embedded production bundles.
+
 ## [1.1.0-dev] - 2026-09-02
 
 ### Added
@@ -97,7 +152,8 @@ beta.2; automatic updates are self-contained from beta.2 onward.
 - Signed GitHub Release staging, stable launcher activation, health rollback, Compose/systemd deployment, and OpenAPI/golden contracts.
 - MusicMate Navidrome link/provider compatibility types.
 
-[Unreleased]: https://github.com/mythezone/navidrome-music-room/compare/v1.1.0-dev...HEAD
+[Unreleased]: https://github.com/mythezone/navidrome-music-room/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/mythezone/navidrome-music-room/compare/v1.1.0-dev...v1.2.0
 [1.1.0-dev]: https://github.com/mythezone/navidrome-music-room/compare/v1.0.0...v1.1.0-dev
 [1.0.0]: https://github.com/mythezone/navidrome-music-room/compare/v0.1.0-beta.3...v1.0.0
 [0.1.0-beta.3]: https://github.com/mythezone/navidrome-music-room/compare/v0.1.0-beta.2...v0.1.0-beta.3

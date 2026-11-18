@@ -13,7 +13,7 @@ import (
 
 const roomColumns = `
 r.room_id, r.name, r.owner_username, r.owner_display_name, r.status,
-r.queue_limit, r.playback_mode, r.music_folder_ids_json, r.preload_next_track,
+r.queue_limit, r.playback_mode, r.music_folder_ids_json, r.preload_next_track, r.allow_member_skip,
 r.created_unix_ms, r.updated_unix_ms`
 
 type scanner interface{ Scan(...any) error }
@@ -25,7 +25,7 @@ func scanRoom(row scanner) (domain.Room, error) {
 	var created, updated int64
 	err := row.Scan(
 		&room.RoomID, &room.Name, &room.OwnerUsername, &room.OwnerDisplayName, &room.Status,
-		&room.QueueLimit, &room.PlaybackMode, &foldersJSON, &preload, &created, &updated,
+		&room.QueueLimit, &room.PlaybackMode, &foldersJSON, &preload, &room.AllowMemberSkip, &created, &updated,
 	)
 	if err != nil {
 		return domain.Room{}, err
@@ -60,10 +60,10 @@ func (s *Store) CreateRoom(ctx context.Context, room domain.Room) (domain.Room, 
 	if _, err = tx.ExecContext(ctx, `
 INSERT INTO rooms(
     room_id, name, owner_username, owner_display_name, status, queue_limit, playback_mode,
-    music_folder_ids_json, preload_next_track, created_unix_ms, updated_unix_ms
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    music_folder_ids_json, preload_next_track, allow_member_skip, created_unix_ms, updated_unix_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		room.RoomID, room.Name, room.OwnerUsername, room.OwnerDisplayName, room.Status,
-		room.QueueLimit, room.PlaybackMode, string(foldersJSON), boolInt(room.PreloadNextTrack),
+		room.QueueLimit, room.PlaybackMode, string(foldersJSON), boolInt(room.PreloadNextTrack), boolInt(room.AllowMemberSkip),
 		unixMillis(now), unixMillis(now),
 	); err != nil {
 		_ = tx.Rollback()
@@ -129,9 +129,9 @@ func (s *Store) UpdateRoom(ctx context.Context, room domain.Room, actor string) 
 	now := time.Now().UTC()
 	result, err := s.db.ExecContext(ctx, `
 UPDATE rooms SET name = ?, queue_limit = ?, playback_mode = ?, music_folder_ids_json = ?,
-    preload_next_track = ?, updated_unix_ms = ?
+    preload_next_track = ?, allow_member_skip = ?, updated_unix_ms = ?
 WHERE room_id = ?`, room.Name, room.QueueLimit, room.PlaybackMode, string(foldersJSON),
-		boolInt(room.PreloadNextTrack), unixMillis(now), room.RoomID)
+		boolInt(room.PreloadNextTrack), boolInt(room.AllowMemberSkip), unixMillis(now), room.RoomID)
 	if err != nil {
 		return domain.Room{}, err
 	}

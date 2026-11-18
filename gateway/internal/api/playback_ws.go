@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,7 +18,8 @@ type playbackRequest struct {
 }
 
 type addTrackRequest struct {
-	Track domain.NavidromeTrackRef `json:"track"`
+	PlayNext bool                     `json:"playNext,omitempty"`
+	Track    domain.NavidromeTrackRef `json:"track"`
 }
 
 type queueOrderRequest struct {
@@ -60,10 +62,6 @@ func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	if err := requireManager(session, room); err != nil {
-		writeError(w, err)
-		return
-	}
 	if room.Status != domain.RoomOpen {
 		writeError(w, domain.NewError(409, "room_closed", "Room is closed"))
 		return
@@ -74,13 +72,33 @@ func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.Command = strings.ToLower(strings.TrimSpace(input.Command))
-	state, err := s.store.ApplyPlayback(r.Context(), room.RoomID, input.Command, input.PositionSeconds, input.ExpectedRevision, session.User.Username)
+
+	if input.Command == "next" {
+		current, err := s.store.Playback(r.Context(), room.RoomID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		if requireManager(session, room) != nil && !room.AllowMemberSkip && !(current.CurrentTrack != nil && domain.EqualUsername(current.Contributor, session.User.Username)) {
+			writeError(w, domain.NewError(403, "skip_permission_required", "Skipping requires permission or contribution of the current track"))
+			return
+		}
+		// Bind contributor permission to the same revision the transaction will change.
+		if current.Revision != input.ExpectedRevision {
+			writeError(w, domain.ErrorWithDetails(409, "revision_conflict", "Playback state has changed", map[string]any{"latest": current}))
+			return
+		}
+	} else if err := requireManager(session, room); err != nil {
+		writeError(w, err)
+		return
+	}
+	state, err := s.store.ApplyPlayback(r.Context(), room.RoomID, input.Command, input.PositionSeconds, input.ExpectedRevision, session.User.Username, s.hub.OnlineUsers(room.RoomID))
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	s.hub.Broadcast(room.RoomID, domain.Event{Type: "playback", Revision: state.Revision, Payload: state})
-	if input.Command == "next" || input.Command == "play" || input.Command == "stop" {
+	if input.Command == "next" || input.Command == "previous" || input.Command == "play" || input.Command == "stop" {
 		if queue, err := s.store.ListQueue(r.Context(), room.RoomID); err == nil {
 			s.hub.Broadcast(room.RoomID, domain.Event{Type: "queue", Payload: queue})
 		}
@@ -106,12 +124,23 @@ func (s *Server) addQueueTrack(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	if input.Track.MusicFolderID <= 0 || !domain.ContainsFolder(room.MusicFolderIDs, input.Track.MusicFolderID) ||
-		!domain.ContainsFolder(session.User.MusicFolderIDs, input.Track.MusicFolderID) {
+
+	if input.PlayNext {
+		if err := requireManager(session, room); err != nil {
+			writeError(w, err)
+			return
+		}
+	}
+	s.enqueueTrack(w, r, session, room, input.Track, input.PlayNext)
+}
+
+func (s *Server) enqueueTrack(w http.ResponseWriter, r *http.Request, session domain.Session, room domain.Room, ref domain.NavidromeTrackRef, playNext bool) {
+	if ref.MusicFolderID <= 0 || !domain.ContainsFolder(room.MusicFolderIDs, ref.MusicFolderID) ||
+		!domain.ContainsFolder(session.User.MusicFolderIDs, ref.MusicFolderID) {
 		writeError(w, domain.NewError(403, "library_access_required", "Track is outside the room or user music folders"))
 		return
 	}
-	track, err := s.sessions.ValidateTrack(r.Context(), session, input.Track)
+	track, err := s.sessions.ValidateTrack(r.Context(), session, ref)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -121,8 +150,12 @@ func (s *Server) addQueueTrack(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	position := 0
+	if playNext {
+		position = 1
+	}
 	entry, primedPlayback, err := s.store.AddQueueEntry(r.Context(), room, domain.QueueEntry{
-		QueueID: queueID, RoomID: room.RoomID, Track: track,
+		QueueID: queueID, RoomID: room.RoomID, Track: track, Position: position,
 		Contributor: session.User.Username, ContributorName: session.User.DisplayName,
 	})
 	if err != nil {
@@ -135,9 +168,11 @@ func (s *Server) addQueueTrack(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	queue, err := s.store.ListQueue(r.Context(), room.RoomID)
-	if err == nil {
-		s.hub.Broadcast(room.RoomID, domain.Event{Type: "queue", Payload: queue})
+	if err != nil {
+		writeError(w, err)
+		return
 	}
+	s.hub.Broadcast(room.RoomID, domain.Event{Type: "queue", Payload: queue})
 	response := map[string]any{"entry": entry, "queue": queue}
 	if primedPlayback != nil {
 		response["playback"] = *primedPlayback
@@ -310,9 +345,25 @@ func (s *Server) buildSnapshot(ctx context.Context, session domain.Session, room
 			self.Online = true
 		}
 	}
-	_ = session
+
+	canManage := session.User.Admin || domain.EqualUsername(session.User.Username, room.OwnerUsername)
+	canSkip := canManage || room.AllowMemberSkip || (playback.CurrentTrack != nil && domain.EqualUsername(playback.Contributor, session.User.Username))
+	var notice *domain.UpdateNotice
+	if session.User.Admin {
+		channel := "stable"
+		if state, err := s.store.PluginState(ctx); err == nil && state.UpdateChannel == "beta" {
+			channel = "beta"
+		}
+		status := s.updater.Status(ctx, channel)
+		if status.UpdateAvailable {
+			value := updateNotice(status)
+			notice = &value
+		}
+	}
 	return domain.Snapshot{
-		Room: room, Self: self, Members: members, Queue: queue, Playback: playback,
+		Permissions:  domain.RoomPermissions{CanManage: canManage, CanControl: canManage, CanSkip: canSkip, CanReorderQueue: canManage, CanFulfillWish: canManage},
+		UpdateNotice: notice,
+		Room:         room, Self: self, Members: members, Queue: queue, Playback: playback,
 		History: history, GeneratedAt: time.Now().UTC(),
 	}, nil
 }
@@ -329,4 +380,82 @@ func boundedQueryInt(r *http.Request, name string, fallback, minimum, maximum in
 		return maximum
 	}
 	return value
+}
+
+func (s *Server) shuffleQueue(w http.ResponseWriter, r *http.Request) { s.changeQueueOrder(w, r, true) }
+func (s *Server) topQueue(w http.ResponseWriter, r *http.Request)     { s.changeQueueOrder(w, r, false) }
+func (s *Server) changeQueueOrder(w http.ResponseWriter, r *http.Request, shuffle bool) {
+	session, room, _, err := s.requireRoomAccess(r, true)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if err = requireManager(session, room); err != nil {
+		writeError(w, err)
+		return
+	}
+	queue, err := s.store.ListQueue(r.Context(), room.RoomID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if shuffle {
+		if len(queue) >= 3 {
+			rand.Shuffle(len(queue)-1, func(i, j int) { queue[i+1], queue[j+1] = queue[j+1], queue[i+1] })
+		}
+	} else {
+		id := r.PathValue("queue_id")
+		if domain.ValidateID(id) != nil {
+			writeError(w, domain.NewError(400, "queue_id_invalid", "Queue ID is invalid"))
+			return
+		}
+		index := -1
+		for i, entry := range queue {
+			if entry.QueueID == id {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			writeError(w, domain.NewError(404, "queue_entry_not_found", "Queue entry was not found"))
+			return
+		}
+		entry := queue[index]
+		copy(queue[1:index+1], queue[:index])
+		queue[0] = entry
+	}
+	ids := make([]string, 0, len(queue))
+	for _, entry := range queue {
+		ids = append(ids, entry.QueueID)
+	}
+	queue, err = s.store.ReorderQueue(r.Context(), room.RoomID, ids, session.User.Username)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	s.hub.Broadcast(room.RoomID, domain.Event{Type: "queue", Payload: queue})
+	writeJSON(w, 200, map[string]any{"queue": queue})
+}
+
+func (s *Server) requeueHistory(w http.ResponseWriter, r *http.Request) {
+	session, room, _, err := s.requireRoomAccess(r, true)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if room.Status != domain.RoomOpen {
+		writeError(w, domain.NewError(409, "room_closed", "Room is closed"))
+		return
+	}
+	id := r.PathValue("history_id")
+	if domain.ValidateID(id) != nil {
+		writeError(w, domain.NewError(400, "history_id_invalid", "History ID is invalid"))
+		return
+	}
+	entry, err := s.store.GetHistoryEntry(r.Context(), room.RoomID, id)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	s.enqueueTrack(w, r, session, room, entry.Track, false)
 }

@@ -1,4 +1,7 @@
+import { errorText } from './i18n'
 import type {
+  ChatMessage, ChatPayload, MemberProfile, Period, PlaybackCommand, RoomSettings,
+  RoomRankings, RoomStatistics, RoomWish, StickerPack, WishPayload, WishFulfillment,
   GatewayErrorBody,
   GatewaySession,
   HistoryEntry,
@@ -34,7 +37,7 @@ export async function navidromeLogin(username: string, password: string): Promis
     credentials: 'same-origin',
   })
   const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new GatewayError('Navidrome 用户名或密码错误', response.status, 'navidrome_login_failed')
+  if (!response.ok) throw new GatewayError(errorText('navidrome_login_failed'), response.status, 'navidrome_login_failed')
   return payload
 }
 
@@ -70,7 +73,7 @@ export class GatewayClient {
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (options.body !== undefined) headers['Content-Type'] = 'application/json'
     if (authenticated) {
-      if (!this.session?.sessionToken) throw new GatewayError('听歌房会话尚未建立', 401, 'session_missing')
+      if (!this.session?.sessionToken) throw new GatewayError(errorText('session_required'), 401, 'session_missing')
       headers.Authorization = `Bearer ${this.session.sessionToken}`
     }
     if (!['GET', 'HEAD'].includes(method)) headers['Idempotency-Key'] = idempotencyKey()
@@ -84,7 +87,7 @@ export class GatewayClient {
     const payload = (await response.json().catch(() => ({}))) as GatewayErrorBody & T
     if (!response.ok) {
       throw new GatewayError(
-        payload.error?.message || `请求失败 (${response.status})`,
+        errorText(payload.error?.code || 'request_failed'),
         response.status,
         payload.error?.code || 'request_failed',
         payload.error?.details,
@@ -113,17 +116,17 @@ export class GatewayClient {
     return this.request(`/rooms/${encodeURIComponent(roomID)}/history?limit=100&offset=${offset}`)
   }
 
-  playback(roomID: string, command: string, expectedRevision: number, positionSeconds?: number): Promise<PlaybackState> {
+  playback(roomID: string, command: PlaybackCommand, expectedRevision: number, positionSeconds?: number): Promise<PlaybackState> {
     return this.request(`/rooms/${encodeURIComponent(roomID)}/playback`, {
       method: 'POST',
       body: { command, expectedRevision, ...(positionSeconds === undefined ? {} : { positionSeconds }) },
     })
   }
 
-  addTrack(roomID: string, track: TrackRef): Promise<QueueMutation> {
+  addTrack(roomID: string, track: TrackRef, playNext = false): Promise<QueueMutation> {
     return this.request(`/rooms/${encodeURIComponent(roomID)}/queue/tracks`, {
       method: 'POST',
-      body: { track },
+      body: { track, playNext },
     })
   }
 
@@ -142,6 +145,89 @@ export class GatewayClient {
 
   websocketTicket(roomID: string): Promise<{ webSocketURL: string; expiresAt: string }> {
     return this.request(`/rooms/${encodeURIComponent(roomID)}/ws-ticket`, { method: 'POST', body: {} })
+  }
+
+
+  patchRoom(roomID: string, patch: Partial<RoomSettings>): Promise<Room> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}`, { method: 'PATCH', body: patch })
+  }
+
+  shuffleQueue(roomID: string): Promise<{ queue: QueueEntry[] }> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/queue/shuffle`, { method: 'POST', body: {} })
+  }
+
+  topQueue(roomID: string, queueID: string): Promise<{ queue: QueueEntry[] }> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/queue/${encodeURIComponent(queueID)}/top`, { method: 'POST', body: {} })
+  }
+
+  requeueHistory(roomID: string, historyID: string): Promise<QueueMutation> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/history/${encodeURIComponent(historyID)}/requeue`, { method: 'POST', body: {} })
+  }
+
+  stickers(roomID: string): Promise<{ packs: StickerPack[] }> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/stickers`)
+  }
+
+  chatMessages(roomID: string, limit = 50, before = ''): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (before) query.set('before', before)
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/chat?${query}`)
+  }
+
+  sendMessage(roomID: string, payload: ChatPayload): Promise<ChatMessage> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/chat`, { method: 'POST', body: payload })
+  }
+
+  recallMessage(roomID: string, messageID: string): Promise<ChatMessage> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/chat/${encodeURIComponent(messageID)}/recall`, { method: 'POST', body: {} })
+  }
+
+  deleteMessage(roomID: string, messageID: string): Promise<void> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/chat/${encodeURIComponent(messageID)}`, { method: 'DELETE' })
+  }
+
+  statistics(roomID: string, period: Period): Promise<RoomStatistics> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/statistics?period=${period}`)
+  }
+
+  rankings(roomID: string, period: Period): Promise<RoomRankings> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/rankings?period=${period}`)
+  }
+
+  achievements(roomID: string): Promise<MemberProfile> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/achievements`)
+  }
+
+  memberProfile(roomID: string, username: string): Promise<MemberProfile> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/members/${encodeURIComponent(username)}/profile`)
+  }
+
+  selectBadge(roomID: string, badgeID: string): Promise<MemberProfile> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/achievements/selected`, { method: 'PUT', body: { badgeID } })
+  }
+
+  wishes(roomID: string, status: 'pending' | 'fulfilled' | '' = ''): Promise<{ wishes: RoomWish[] }> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/wishes${status ? `?status=${status}` : ''}`)
+  }
+
+  createWish(roomID: string, payload: WishPayload): Promise<RoomWish> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/wishes`, { method: 'POST', body: payload })
+  }
+
+  fulfillWish(roomID: string, wishID: string, payload: WishFulfillment): Promise<RoomWish> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/wishes/${encodeURIComponent(wishID)}/fulfill`, { method: 'POST', body: payload })
+  }
+
+  deleteWish(roomID: string, wishID: string): Promise<void> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/wishes/${encodeURIComponent(wishID)}`, { method: 'DELETE' })
+  }
+
+  removeMember(roomID: string, username: string): Promise<void> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/members/${encodeURIComponent(username)}`, { method: 'DELETE' })
+  }
+
+  leave(roomID: string): Promise<void> {
+    return this.request(`/rooms/${encodeURIComponent(roomID)}/leave`, { method: 'POST', body: {} })
   }
 
   capabilities(): Promise<{ features: Record<string, boolean> }> {

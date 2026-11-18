@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/go/pkg/mod go test ./...
 
 FROM --platform=$BUILDPLATFORM ${PLUGIN_BUILD_IMAGE} AS plugin-build
 USER root
-ARG VERSION=1.1.0-dev
+ARG VERSION=1.2.0
 ARG BUILDARCH
 ARG TINYGO_VERSION=0.41.1
 RUN if command -v tinygo >/dev/null 2>&1; then \
@@ -73,15 +73,15 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     LC_ALL=C grep -aFq -- "${normalized_version}" /out/plugin.wasm
 
 FROM debian:bookworm-slim AS ndp-build
-ARG VERSION=1.1.0-dev
+ARG VERSION=1.2.0
 RUN apt-get update && apt-get install -y --no-install-recommends zip ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /out/plugin
 COPY plugin/manifest.json ./manifest.json
 COPY release.json /out/release.json
 COPY --from=plugin-build /out/plugin.wasm ./plugin.wasm
 RUN normalized_version="${VERSION#v}" && \
-    sed -i "s/\"version\": \"1.1.0-dev\"/\"version\": \"${normalized_version}\"/" manifest.json && \
-    sed -i "s/1.1.0-dev/${normalized_version}/" /out/release.json && \
+    sed -E -i "s/\"version\": \"[^\"]+\"/\"version\": \"${normalized_version}\"/" manifest.json && \
+    sed -E -i "s/\"version\": \"[^\"]+\"/\"version\": \"${normalized_version}\"/" /out/release.json && \
     zip -q -9 /out/navidrome-music-room.ndp manifest.json plugin.wasm
 
 FROM ${COSIGN_IMAGE} AS cosign
@@ -95,7 +95,7 @@ COPY --from=ndp-build /out/navidrome-music-room.ndp /navidrome-music-room.ndp
 COPY --from=ndp-build /out/release.json /release.json
 
 FROM debian:bookworm-slim
-ARG VERSION=1.1.0-dev
+ARG VERSION=1.2.0
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
 COPY --from=gateway-build /out/music-room-launcher /usr/local/bin/music-room-launcher
 COPY --from=gateway-build /out/music-room-gateway /opt/music-room/release/music-room-gateway

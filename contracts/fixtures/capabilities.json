@@ -10,11 +10,11 @@
     "synchronizedPlayback": true,
     "queue": true,
     "history": true,
-    "chat": false,
-    "stickers": false,
-    "statistics": false,
-    "rankings": false,
-    "achievements": false,
+    "chat": true,
+    "stickers": true,
+    "statistics": true,
+    "rankings": true,
+    "achievements": true,
     "uploads": false,
     "onlineSources": false
   }

@@ -64,6 +64,7 @@ func run() int {
 		MaxHeaderBytes: 1 << 20,
 	}
 	go roomServer.RunClock(ctx)
+	go roomServer.RunUpdateChecker(ctx)
 	serverError := make(chan error, 1)
 	go func() {
 		logger.Info("gateway listening",

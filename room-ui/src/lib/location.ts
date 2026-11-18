@@ -1,3 +1,5 @@
+import { errorText } from './i18n'
+
 import type { NavidromeProof } from '../types'
 
 const proofPattern = /^[a-f\d]{32}$/i
@@ -41,7 +43,7 @@ export function storeNavidromeLogin(
   const salt = String(value.subsonicSalt || '')
   const token = String(value.subsonicToken || '')
   if (!username || !saltPattern.test(salt) || !proofPattern.test(token)) {
-    throw new Error('Navidrome 登录响应缺少 OpenSubsonic 凭据')
+    throw new Error(errorText('navidrome_login_failed'))
   }
   if (value.token) storage.setItem('token', String(value.token))
   if (value.id) storage.setItem('userId', String(value.id))
@@ -56,4 +58,23 @@ export function storeNavidromeLogin(
 
 export function navidromeAppURL(): string {
   return `${window.location.origin}/app/`
+}
+
+export function resourceFromURL(value: string, origin = window.location.origin): import('../types').ChatReference | null {
+  try {
+    const url = new URL(value, origin)
+    if (url.origin !== origin || !['http:', 'https:'].includes(url.protocol)) return null
+    const params = new URLSearchParams(url.hash.slice(1))
+    const kind = params.get('resource')
+    const id = params.get('id')
+    if (!id || !['track', 'album', 'artist'].includes(kind || '')) return null
+    return { kind: kind as 'track' | 'album' | 'artist', id, title: params.get('title') || '' }
+  } catch { return null }
+}
+
+export function safeResourceURL(value: string): string {
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : ''
+  } catch { return '' }
 }

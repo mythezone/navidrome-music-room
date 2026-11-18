@@ -153,6 +153,59 @@ ALTER TABLE plugin_state ADD COLUMN license_file TEXT NOT NULL DEFAULT '';
 ALTER TABLE plugin_state ADD COLUMN update_channel TEXT NOT NULL DEFAULT 'stable';
 `,
 	},
+	{
+		version: 5,
+		name:    "collaborative_room_features",
+		sql: `
+ALTER TABLE rooms ADD COLUMN allow_member_skip INTEGER NOT NULL DEFAULT 1;
+CREATE TABLE chat_messages (
+    message_id TEXT PRIMARY KEY,
+    room_id TEXT NOT NULL REFERENCES rooms(room_id) ON DELETE CASCADE,
+    sender_username TEXT NOT NULL COLLATE NOCASE,
+    sender_display_name TEXT NOT NULL,
+    message_type TEXT NOT NULL CHECK (message_type IN ('chat', 'review', 'system')),
+    body TEXT NOT NULL DEFAULT '',
+    sticker_id TEXT NOT NULL DEFAULT '',
+    reply_to_id TEXT NOT NULL DEFAULT '',
+    mentions_json TEXT NOT NULL DEFAULT '[]',
+    references_json TEXT NOT NULL DEFAULT '[]',
+    recalled_unix_ms INTEGER,
+    deleted_unix_ms INTEGER,
+    created_unix_ms INTEGER NOT NULL
+);
+CREATE INDEX idx_chat_room_created ON chat_messages(room_id, created_unix_ms DESC, message_id DESC);
+CREATE TABLE room_wishes (
+    wish_id TEXT PRIMARY KEY,
+    room_id TEXT NOT NULL REFERENCES rooms(room_id) ON DELETE CASCADE,
+    author_username TEXT NOT NULL COLLATE NOCASE,
+    author_display_name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('track', 'album', 'artist')),
+    title TEXT NOT NULL,
+    artist TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'fulfilled')),
+    fulfilled_by TEXT NOT NULL DEFAULT '',
+    fulfilled_by_name TEXT NOT NULL DEFAULT '',
+    response_note TEXT NOT NULL DEFAULT '',
+    resources_json TEXT NOT NULL DEFAULT '[]',
+    created_unix_ms INTEGER NOT NULL,
+    updated_unix_ms INTEGER NOT NULL
+);
+CREATE INDEX idx_wishes_room_status ON room_wishes(room_id, status, updated_unix_ms DESC);
+CREATE TABLE member_stats (
+    room_id TEXT NOT NULL REFERENCES rooms(room_id) ON DELETE CASCADE,
+    username TEXT NOT NULL COLLATE NOCASE,
+    display_name TEXT NOT NULL DEFAULT '',
+    stay_seconds REAL NOT NULL DEFAULT 0,
+    requested_count INTEGER NOT NULL DEFAULT 0,
+    listened_count INTEGER NOT NULL DEFAULT 0,
+    chat_count INTEGER NOT NULL DEFAULT 0,
+    selected_badge_id TEXT NOT NULL DEFAULT '',
+    updated_unix_ms INTEGER NOT NULL,
+    PRIMARY KEY (room_id, username)
+);
+`,
+	},
 }
 
 func Open(ctx context.Context, databasePath, dataDir string) (*Store, error) {

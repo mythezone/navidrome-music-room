@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -223,4 +224,45 @@ func (c *client) writeJSON(value any) error {
 	defer c.writeMu.Unlock()
 	_ = c.connection.SetWriteDeadline(time.Now().Add(8 * time.Second))
 	return c.connection.WriteJSON(value)
+}
+
+func (h *Hub) AllRoomsOnlineUsers() map[string][]string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	result := make(map[string][]string, len(h.rooms))
+	for roomID, clients := range h.rooms {
+		users := []string{}
+		seen := map[string]bool{}
+		for item := range clients {
+			key := strings.ToLower(item.username)
+			if !seen[key] {
+				users = append(users, item.username)
+				seen[key] = true
+			}
+		}
+		slices.Sort(users)
+		result[roomID] = users
+	}
+	return result
+}
+
+func (h *Hub) BroadcastUsers(isTarget func(username string) bool, event domain.Event) {
+	h.mu.RLock()
+	targets := map[*client]string{}
+	for roomID, clients := range h.rooms {
+		for item := range clients {
+			targets[item] = roomID
+		}
+	}
+	h.mu.RUnlock()
+	event.ServerTime = time.Now().UTC()
+	for item, roomID := range targets {
+		if !isTarget(item.username) {
+			continue
+		}
+		event.RoomID = roomID
+		if err := item.writeJSON(event); err != nil {
+			_ = item.connection.Close()
+		}
+	}
 }

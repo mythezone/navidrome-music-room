@@ -17,6 +17,9 @@ import (
 const generatedSecretBytes = 32
 
 type Config struct {
+	AutoUpdateCheck     bool
+	UpdateCheckInterval time.Duration
+	UpdateWebhookURL    string
 	ListenAddress       string
 	DataDir             string
 	DatabasePath        string
@@ -79,8 +82,18 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("load plugin pairing token: %w", err)
 	}
 
+	webhook := strings.TrimSpace(os.Getenv("MUSIC_ROOM_UPDATE_WEBHOOK_URL"))
+	if webhook != "" {
+		parsed, err := url.Parse(webhook)
+		if err != nil || parsed.Hostname() == "" || parsed.User != nil || parsed.Fragment != "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return Config{}, fmt.Errorf("MUSIC_ROOM_UPDATE_WEBHOOK_URL must be an absolute http(s) URL without credentials or fragment")
+		}
+	}
 	repository := envOr("MUSIC_ROOM_RELEASE_REPOSITORY", "mythezone/navidrome-music-room")
 	return Config{
+		AutoUpdateCheck:     envBool("MUSIC_ROOM_AUTO_UPDATE_CHECK", true),
+		UpdateCheckInterval: envDuration("MUSIC_ROOM_UPDATE_CHECK_INTERVAL", 6*time.Hour),
+		UpdateWebhookURL:    webhook,
 		ListenAddress:       envOr("MUSIC_ROOM_LISTEN_ADDRESS", ":4534"),
 		DataDir:             absDataDir,
 		DatabasePath:        filepath.Join(absDataDir, "rooms.sqlite3"),

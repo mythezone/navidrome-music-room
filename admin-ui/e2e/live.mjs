@@ -27,6 +27,7 @@ try {
 
   await page.goto(`${baseURL}/app/`)
   await page.evaluate((value) => {
+    localStorage.setItem('nmr:locale', 'zh-CN')
     localStorage.setItem('token', value.token)
     localStorage.setItem('userId', value.id)
     localStorage.setItem('name', value.name)

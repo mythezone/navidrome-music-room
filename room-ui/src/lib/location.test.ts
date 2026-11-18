@@ -38,3 +38,15 @@ describe('Navidrome proof storage', () => {
     expect(replaceState).toHaveBeenCalledWith(null, '', '/music-room/join/0123/?source=qr')
   })
 })
+
+describe('wish library links', () => {
+  it('recognizes same-origin resources and refuses executable or external URLs', async () => {
+    const { resourceFromURL, safeResourceURL } = await import('./location')
+    expect(resourceFromURL('https://music.test/music-room/join/room/#resource=album&id=a%2Fb&title=Album', 'https://music.test')).toEqual({ kind: 'album', id: 'a/b', title: 'Album' })
+    expect(resourceFromURL('https://evil.test/#resource=track&id=song', 'https://music.test')).toBeNull()
+    expect(resourceFromURL('javascript:alert(1)', 'https://music.test')).toBeNull()
+    expect(safeResourceURL('javascript:alert(1)')).toBe('')
+    expect(safeResourceURL('https://user:secret@music.test/')).toBe('')
+    expect(safeResourceURL('https://music.test/album')).toBe('https://music.test/album')
+  })
+})

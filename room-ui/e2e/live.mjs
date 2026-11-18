@@ -106,6 +106,7 @@ async function waitForExchange(account, timeout = 45_000) {
 }
 
 async function loginRoomPage(page, url, account) {
+  await page.addInitScript(() => localStorage.setItem('nmr:locale', 'zh-CN'))
   await page.goto(url, { waitUntil: 'domcontentloaded' })
   const loginForm = page.locator('input[autocomplete="username"]')
   if (await loginForm.isVisible().catch(() => false)) {
@@ -246,7 +247,7 @@ try {
   assert.match(await adminPage.locator('[data-testid="current-track"]:visible').innerText(), new RegExp(song.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
 
   await memberPage.locator('[data-testid="listen-button"]:visible').click()
-  await adminPage.locator('[data-testid="listen-button"]:visible').click()
+  await adminPage.locator('.local-listen:visible').click()
   await adminPage.waitForFunction(() => {
     const audio = document.querySelector('audio[data-music-room-audio="true"]')
     return audio && !audio.paused && audio.currentTime > 0.4
@@ -310,7 +311,7 @@ try {
   await adminPage.locator('[data-testid="catalog-artist-grid"] .artist-card').first().waitFor({ state: 'visible' })
   const artistCards = await adminPage.locator('[data-testid="catalog-artist-grid"] .artist-card').count()
   assert.ok(artistCards > 0, 'the Artists catalog is empty')
-  await adminPage.locator('[data-testid="catalog-artist-grid"] .artist-card').first().click()
+  await adminPage.locator('[data-testid="catalog-artist-grid"] .artist-open').first().click()
   await adminPage.locator('[data-testid="catalog-album-grid"] .cover-card').first().waitFor({ state: 'visible' })
 
   await adminPage.locator('.desktop-tabs button').filter({ hasText: '待播放' }).click()

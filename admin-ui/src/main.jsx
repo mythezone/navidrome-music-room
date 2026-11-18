@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
 import { CssBaseline, ThemeProvider, createMuiTheme } from '@material-ui/core'
-import App from './App'
+import App, { ErrorBoundary } from './App'
 
 const theme = createMuiTheme({
   palette: {
@@ -27,9 +27,11 @@ const theme = createMuiTheme({
 })
 
 ReactDOM.render(
-  <ThemeProvider theme={theme}>
-    <CssBaseline />
-    <App />
-  </ThemeProvider>,
+  <ErrorBoundary>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <App />
+    </ThemeProvider>
+  </ErrorBoundary>,
   document.getElementById('root'),
 )

@@ -28,9 +28,14 @@ case_id=$(printf '%s-%s' "$navidrome_tag" "$$" | tr -c 'A-Za-z0-9_.-' '-')
 network_name=nmr-e2e-network-$case_id
 navidrome_name=nmr-e2e-navidrome-$case_id
 gateway_name=nmr-e2e-gateway-$case_id
-work_dir=$(mktemp -d)
+work_dir=$(mktemp -d "$root_dir/.integration-navidrome.XXXXXX")
 
 cleanup() {
+  result=$?
+  if [ "$result" -ne 0 ]; then
+    docker logs "$gateway_name" >&2 || true
+    docker logs "$navidrome_name" >&2 || true
+  fi
   docker rm -f "$gateway_name" "$navidrome_name" >/dev/null 2>&1 || true
   docker network rm "$network_name" >/dev/null 2>&1 || true
   rm -rf "$work_dir"
@@ -58,6 +63,9 @@ if [ -n "$gateway_image" ]; then
     --publish 127.0.0.1::4534 \
     --tmpfs /data:rw,exec,uid=65532,gid=65532,mode=0700 \
     --tmpfs /plugins:rw,uid=65532,gid=65532,mode=0700 \
+    --env NO_PROXY=navidrome,localhost,127.0.0.1 \
+    --env no_proxy=navidrome,localhost,127.0.0.1 \
+    --env MUSIC_ROOM_AUTO_UPDATE_CHECK=false \
     --env MUSIC_ROOM_DATA_DIR=/data \
     --env MUSIC_ROOM_PLUGIN_INSTALL_DIR=/plugins \
     --env MUSIC_ROOM_NAVIDROME_INTERNAL_URL=http://navidrome:4533 \
@@ -72,6 +80,9 @@ else
     --publish 127.0.0.1::4534 \
     --tmpfs /data:rw,uid=65532,gid=65532,mode=0700 \
     --volume "$gateway_binary:/music-room-gateway:ro" \
+    --env NO_PROXY=navidrome,localhost,127.0.0.1 \
+    --env no_proxy=navidrome,localhost,127.0.0.1 \
+    --env MUSIC_ROOM_AUTO_UPDATE_CHECK=false \
     --env MUSIC_ROOM_DATA_DIR=/data \
     --env MUSIC_ROOM_NAVIDROME_INTERNAL_URL=http://navidrome:4533 \
     --env MUSIC_ROOM_NAVIDROME_PUBLIC_URL=https://music.e2e.invalid \
@@ -106,10 +117,17 @@ wait_for_url() {
 wait_for_url "$navidrome_base/ping" Navidrome
 wait_for_url "$gateway_base/healthz" 'Music Room Gateway'
 
-curl -fsS --max-time 10 \
+admin_login=$(curl -fsS --max-time 10 \
   --header 'Content-Type: application/json' \
   --data "{\"username\":\"$username\",\"password\":\"$password\"}" \
-  "$navidrome_base/auth/createAdmin" >/dev/null
+  "$navidrome_base/auth/createAdmin")
+admin_jwt=$(printf '%s' "$admin_login" | jq -er '.token')
+member_username=nmr-member
+member_password=nmr-member-password
+member_payload=$(jq -cn --arg username "$member_username" --arg password "$member_password" \
+  '{userName:$username,name:"E2E Member",password:$password,isAdmin:false}')
+curl -fsS --max-time 10 --header "X-ND-Authorization: Bearer $admin_jwt" \
+  --header 'Content-Type: application/json' --data "$member_payload" "$navidrome_base/api/user" >/dev/null
 
 token=$(printf '%s%s' "$password" "$salt" | md5sum | awk '{print $1}')
 subsonic() {
@@ -182,8 +200,8 @@ test -s "$transcoded_file"
 
 sent_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 sync_payload=$(jq -cn \
-  --arg sentAt "$sent_at" --arg username "$username" \
-  '{pluginVersion:"e2e",generation:1,navidromeInternalURL:"http://navidrome:4533",navidromePublicURL:"https://music.e2e.invalid",gatewayPublicURL:"https://rooms.e2e.invalid",sentAt:$sentAt,users:[{username:$username,displayName:"E2E Admin",admin:true}]}')
+  --arg sentAt "$sent_at" --arg username "$username" --arg member "$member_username" \
+  '{pluginVersion:"e2e",generation:1,navidromeInternalURL:"http://navidrome:4533",navidromePublicURL:"https://music.e2e.invalid",gatewayPublicURL:"https://rooms.e2e.invalid",sentAt:$sentAt,users:[{username:$username,displayName:"E2E Admin",admin:true},{username:$member,displayName:"E2E Member",admin:false}]}')
 curl -fsS --max-time 10 \
   --header "Authorization: Bearer $pairing_token" \
   --header 'Content-Type: application/json' \
@@ -191,12 +209,15 @@ curl -fsS --max-time 10 \
   "$gateway_base/internal/v1/plugin-sync" >/dev/null
 
 exchange_payload=$(jq -cn --arg username "$username" --arg salt "$salt" --arg token "$token" '{username:$username,salt:$salt,token:$token}')
-exchange_json=$(curl -fsS --max-time 10 \
+exchange_json=$(curl -sS --max-time 10 \
   --header 'Content-Type: application/json' \
   --data "$exchange_payload" \
   "$gateway_base/api/v1/auth/exchange")
 session_token=$(printf '%s' "$exchange_json" | jq -r '.sessionToken // empty')
-test -n "$session_token"
+if [ -z "$session_token" ]; then
+  printf 'Gateway auth exchange failed: %s\n' "$exchange_json" >&2
+  exit 1
+fi
 test "$(printf '%s' "$exchange_json" | jq -r '.user.adminRole')" = true
 test "$(printf '%s' "$exchange_json" | jq -r --argjson folder "$folder_id" '.user.musicFolderIDs | index($folder) != null')" = true
 
@@ -210,10 +231,47 @@ test "$room_code" = 201
 room_id=$(jq -r '.roomID // empty' "$room_file")
 test -n "$room_id"
 
-planned_feature_code=$(curl -sS --max-time 10 --output /dev/null --write-out '%{http_code}' \
-  --header "Authorization: Bearer $session_token" \
-  "$gateway_base/api/v1/rooms/$room_id/chat")
-test "$planned_feature_code" = 501
+for feature in chat statistics rankings achievements wishes stickers; do
+  feature_code=$(curl -sS --max-time 10 --output /dev/null --write-out '%{http_code}' \
+    --header "Authorization: Bearer $session_token" "$gateway_base/api/v1/rooms/$room_id/$feature")
+  test "$feature_code" = 200
+done
+admin_code=$(curl -sS --max-time 10 --dump-header "$work_dir/admin-headers" --output /dev/null \
+  --write-out '%{http_code}' "$gateway_base/admin")
+test "$admin_code" = 308
+tr -d '\r' < "$work_dir/admin-headers" | grep -iq '^Location: admin/$'
+
+member_proof=$(printf '%s%s' "$member_password" "$salt" | md5sum | awk '{print $1}')
+member_exchange=$(jq -cn --arg username "$member_username" --arg salt "$salt" --arg token "$member_proof" '{username:$username,salt:$salt,token:$token}')
+member_session=$(curl -fsS --max-time 10 --header 'Content-Type: application/json' --data "$member_exchange" \
+  "$gateway_base/api/v1/auth/exchange" | jq -er '.sessionToken')
+invite=$(curl -fsS --max-time 10 --header "Authorization: Bearer $session_token" \
+  --header 'Content-Type: application/json' --data '{}' "$gateway_base/api/v1/rooms/$room_id/invites" | jq -er '.invite')
+redeem=$(jq -cn --arg roomID "$room_id" --arg invite "$invite" '{roomID:$roomID,invite:$invite}')
+curl -fsS --max-time 10 --header "Authorization: Bearer $member_session" \
+  --header 'Content-Type: application/json' --data "$redeem" "$gateway_base/api/v1/invites/redeem" >/dev/null
+track_payload=$(jq -cn --arg id "$song_id" --argjson folder "$folder_id" '{track:{id:$id,musicFolderID:$folder}}')
+add_track() {
+  curl -fsS --max-time 10 --header "Authorization: Bearer $1" \
+    --header 'Content-Type: application/json' --data "$track_payload" "$gateway_base/api/v1/rooms/$room_id/queue/tracks" >/dev/null
+}
+member_next() {
+  revision=$(curl -fsS --max-time 10 --header "Authorization: Bearer $member_session" \
+    "$gateway_base/api/v1/rooms/$room_id/snapshot" | jq -er '.playback.revision')
+  curl -sS --max-time 10 --output "$work_dir/next.json" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $member_session" --header 'Content-Type: application/json' \
+    --data "{\"command\":\"next\",\"expectedRevision\":$revision}" "$gateway_base/api/v1/rooms/$room_id/playback"
+}
+add_track "$session_token"
+add_track "$member_session"
+test "$(member_next)" = 200
+curl -fsS --max-time 10 --request PATCH --header "Authorization: Bearer $session_token" \
+  --header 'Content-Type: application/json' --data '{"allowMemberSkip":false}' "$gateway_base/api/v1/rooms/$room_id" >/dev/null
+# The contributor can skip their own current track even when member skipping is disabled.
+test "$(member_next)" = 200
+add_track "$session_token"
+test "$(member_next)" = 403
+test "$(jq -r '.error.code' "$work_dir/next.json")" = skip_permission_required
 
 diagnostics_json=$(curl -fsS --max-time 10 \
   --header "Authorization: Bearer $session_token" \
@@ -228,5 +286,5 @@ gateway_media_code=$(curl -sS --max-time 10 --output /dev/null --write-out '%{ht
 test "$gateway_media_code" = 404
 
 navidrome_version=$(printf '%s' "$search_json" | jq -r '."subsonic-response".serverVersion // ."subsonic-response".version // "unknown"')
-printf 'Navidrome %s (%s): auth, folders, search, album, cover, lyrics, Range, transcode, room ACL, planned-feature response, and redacted diagnostics passed\n' \
+printf 'Navidrome %s (%s): auth, folders, search, album, cover, lyrics, Range, transcode, room ACL, community APIs, member skip permissions, admin redirect, and redacted diagnostics passed\n' \
   "$navidrome_tag" "$navidrome_version"

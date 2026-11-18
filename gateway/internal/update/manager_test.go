@@ -2,10 +2,13 @@ package update
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -345,5 +348,70 @@ func assertDomainError(t *testing.T, err error, code string) {
 	var roomError *domain.Error
 	if !errors.As(err, &roomError) || roomError.Code != code {
 		t.Fatalf("expected %s, got %T %v", code, err, err)
+	}
+}
+
+func TestIsNewerVersion(t *testing.T) {
+	cases := []struct {
+		latest, current string
+		newer           bool
+	}{
+		{"1.2.0", "1.1.0-dev", true}, {"1.2.0", "1.2.0-beta.1", true},
+		{"v1.2.0", "1.2.0", false}, {"1.2.0", "1.2.0", false}, {"1.1.0", "1.2.0", false},
+		{"1.10.0", "1.9.9", true}, {"2.0.0", "1.99.99", true}, {"1.2.1", "1.2.0", true},
+		{"1.2.0-beta.10", "1.2.0-beta.2", true}, {"1.2.0-beta.2", "1.2.0-beta.10", false},
+		{"1.2.0-beta", "1.2.0-alpha", true}, {"1.2.0-rc.1", "1.2.0-beta.11", true},
+		{"1.2.0-alpha.1", "1.2.0-alpha", true}, {"1.2.0-alpha", "1.2.0-alpha.1", false},
+		{"1.2.0-alpha.beta", "1.2.0-alpha.1", true}, {"1.2.0-alpha.1", "1.2.0-alpha.beta", false},
+		{"1.2.0-beta.1", "1.2.0", false}, {"1.2.0+build.2", "1.2.0+build.1", false},
+		{"  v1.2.0  ", "  v1.1.0 ", true}, {"1.2.0", "dev", true}, {"v1.2.0", "bootstrap", true},
+		{"", "dev", false}, {"  ", "bootstrap", false}, {"broken", "1.2.0", false},
+		{"1.2.0", "broken", false}, {"1.2", "1.1.0", false}, {"01.2.0", "1.1.0", false},
+		{"1.2.0-beta.01", "1.1.0", false}, {"1.2.0", "1.1.0-beta.01", false},
+		{"1.2.0-", "1.1.0", false}, {"1.2.0-beta..1", "1.1.0", false},
+		{"999999999999999999999.0.0", "100000000000000000000.0.0", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.latest+"_vs_"+tc.current, func(t *testing.T) {
+			if got := isNewerVersion(tc.latest, tc.current); got != tc.newer {
+				t.Fatalf("isNewerVersion(%q,%q)=%v want %v", tc.latest, tc.current, got, tc.newer)
+			}
+		})
+	}
+}
+
+type releaseTransport func(*http.Request) (*http.Response, error)
+
+func (f releaseTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestCheckReleaseMetadataAndCachedStatus(t *testing.T) {
+	storage := &memoryStateStore{}
+	manager, err := NewManager(Config{Repository: "owner/repo", CurrentVersion: "1.1.0-dev", DataDir: t.TempDir(), CosignBinary: "cosign", TrustedRoot: "root", IdentityRegex: "identity"}, storage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.client.Transport = releaseTransport(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/repos/owner/repo/releases/latest" {
+			t.Fatalf("unexpected endpoint: %s", r.URL)
+		}
+		body, _ := json.Marshal(Release{TagName: "v1.2.0", HTMLURL: "https://github.com/owner/repo/releases/tag/v1.2.0", PublishedAt: "2026-11-18T00:00:00Z", Body: " \n" + strings.Repeat("新", 4100) + " \n"})
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(body)), Header: make(http.Header)}, nil
+	})
+	status, err := manager.Check(t.Context(), "stable")
+	if err != nil || !status.UpdateAvailable || len([]rune(status.ReleaseNotes)) != 4000 || status.PublishedAt == "" || status.Prerelease {
+		t.Fatalf("metadata: %+v %v", status, err)
+	}
+	manager.config.CurrentVersion = "1.2.0"
+	if status = manager.Status(t.Context(), "stable"); status.UpdateAvailable {
+		t.Fatal("cached status advertises installed version")
+	}
+	if status = manager.Status(t.Context(), "beta"); status.LatestVersion != "" || status.UpdateAvailable {
+		t.Fatal("cached stable release reused for beta")
+	}
+	if got := releaseNotes(strings.Repeat("a", 3999) + " \ntrailing"); len(got) != 3999 {
+		t.Fatal("truncated notes retain trailing whitespace")
+	}
+	if got := releaseNotes(" \nShort notes\n "); got != "Short notes" {
+		t.Fatalf("untrimmed notes %q", got)
 	}
 }

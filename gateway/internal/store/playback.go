@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/mythezone/navidrome-music-room/gateway/internal/domain"
@@ -74,7 +75,7 @@ func (s *Store) Playback(ctx context.Context, roomID string) (domain.PlaybackSta
 	return record.State, nil
 }
 
-func (s *Store) ApplyPlayback(ctx context.Context, roomID, command string, position *float64, expectedRevision int64, actor string) (domain.PlaybackState, error) {
+func (s *Store) ApplyPlayback(ctx context.Context, roomID, command string, position *float64, expectedRevision int64, actor string, online map[string]bool) (domain.PlaybackState, error) {
 	s.writeLock.Lock()
 	defer s.writeLock.Unlock()
 	now := time.Now().UTC()
@@ -138,7 +139,7 @@ func (s *Store) ApplyPlayback(ctx context.Context, roomID, command string, posit
 			record.State.AnchorServerTime = nil
 		}
 	case "next":
-		if err := finishCurrentTrackTx(ctx, tx, roomID, &record, now); err != nil {
+		if err := finishCurrentTrackTx(ctx, tx, roomID, &record, now, online); err != nil {
 			_ = tx.Rollback()
 			return domain.PlaybackState{}, err
 		}
@@ -150,8 +151,13 @@ func (s *Store) ApplyPlayback(ctx context.Context, roomID, command string, posit
 			record.State.Status = domain.PlaybackPlaying
 			record.State.AnchorServerTime = timePointer(now)
 		}
+	case "previous":
+		if err := previousTrackTx(ctx, tx, roomID, &record, now, online); err != nil {
+			tx.Rollback()
+			return domain.PlaybackState{}, err
+		}
 	case "stop":
-		if err := finishCurrentTrackTx(ctx, tx, roomID, &record, now); err != nil {
+		if err := finishCurrentTrackTx(ctx, tx, roomID, &record, now, online); err != nil {
 			_ = tx.Rollback()
 			return domain.PlaybackState{}, err
 		}
@@ -345,17 +351,52 @@ ORDER BY room_id`)
 	return result, rows.Err()
 }
 
-func finishCurrentTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time) error {
+func finishCurrentTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time, online map[string]bool) error {
 	if record.CurrentHistoryID != "" {
 		position := record.State.PositionSeconds
 		if record.State.CurrentTrack != nil {
 			position = clampPosition(position, record.State.CurrentTrack.DurationSeconds)
 		}
-		if _, err := tx.ExecContext(ctx, `
-UPDATE playback_history SET finished_unix_ms = ?, played_seconds = ?
-WHERE room_id = ? AND history_id = ? AND finished_unix_ms IS NULL`,
-			unixMillis(now), position, roomID, record.CurrentHistoryID); err != nil {
+
+		result, err := tx.ExecContext(ctx, `UPDATE playback_history SET finished_unix_ms = ?, played_seconds = ?
+WHERE room_id = ? AND history_id = ? AND finished_unix_ms IS NULL`, unixMillis(now), position, roomID, record.CurrentHistoryID)
+		if err != nil {
 			return err
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		duration := 0.0
+		if record.State.CurrentTrack != nil {
+			duration = record.State.CurrentTrack.DurationSeconds
+		}
+		if count > 0 && (position >= 30 || (duration > 0 && position >= duration*0.5)) {
+			users := map[string]string{}
+			for username, present := range online {
+				if present {
+					users[strings.ToLower(username)] = username
+				}
+			}
+			if record.State.Contributor != "" {
+				users[strings.ToLower(record.State.Contributor)] = record.State.Contributor
+			}
+			for _, username := range users {
+				var name string
+				err := tx.QueryRowContext(ctx, "SELECT display_name FROM members WHERE room_id = ? AND username = ? COLLATE NOCASE", roomID, username).Scan(&name)
+				if err != nil && !isNotFound(err) {
+					return err
+				}
+				if domain.EqualUsername(username, record.State.Contributor) {
+					name = record.State.ContributorName
+				}
+				if err = incrementStatsTx(ctx, tx, roomID, username, name, domain.MemberStats{ListenedCount: 1}, now); err != nil {
+					return err
+				}
+				if err = insertAuditTx(ctx, tx, username, roomID, "playback.listened", map[string]string{"historyID": record.CurrentHistoryID}); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	record.CurrentHistoryID = ""
@@ -399,7 +440,7 @@ func (s *Store) PauseForEmpty(ctx context.Context, roomID string) (domain.Playba
 	return state, true, err
 }
 
-func (s *Store) AdvanceFinished(ctx context.Context, roomID string) (domain.PlaybackState, bool, error) {
+func (s *Store) AdvanceFinished(ctx context.Context, roomID string, online map[string]bool) (domain.PlaybackState, bool, error) {
 	state, err := s.Playback(ctx, roomID)
 	if err != nil {
 		return domain.PlaybackState{}, false, err
@@ -410,7 +451,7 @@ func (s *Store) AdvanceFinished(ctx context.Context, roomID string) (domain.Play
 	if state.PositionSeconds+0.05 < state.CurrentTrack.DurationSeconds {
 		return state, false, nil
 	}
-	next, err := s.ApplyPlayback(ctx, roomID, "next", nil, state.Revision, "__clock__")
+	next, err := s.ApplyPlayback(ctx, roomID, "next", nil, state.Revision, "__clock__", online)
 	if err != nil {
 		if roomErr, ok := err.(*domain.Error); ok && roomErr.Code == "revision_conflict" {
 			return state, false, nil
@@ -488,4 +529,64 @@ func clampPosition(value, duration float64) float64 {
 func timePointer(value time.Time) *time.Time {
 	copy := value.UTC()
 	return &copy
+}
+
+func (s *Store) GetHistoryEntry(ctx context.Context, roomID, historyID string) (domain.HistoryEntry, error) {
+	entry, err := scanHistory(s.db.QueryRowContext(ctx, `SELECT history_id, room_id, track_json, contributor_username, contributor_display_name,
+ started_unix_ms, finished_unix_ms, played_seconds FROM playback_history WHERE room_id = ? AND history_id = ?`, roomID, historyID))
+	if isNotFound(err) {
+		return entry, domain.NewError(404, "history_not_found", "History entry was not found")
+	}
+	return entry, err
+}
+
+func previousTrackTx(ctx context.Context, tx *sql.Tx, roomID string, record *playbackRecord, now time.Time, online map[string]bool) error {
+	if record.State.CurrentTrack == nil || record.State.PositionSeconds <= 5 {
+		previous, err := scanHistory(tx.QueryRowContext(ctx, `SELECT history_id, room_id, track_json, contributor_username, contributor_display_name,
+   started_unix_ms, finished_unix_ms, played_seconds FROM playback_history
+   WHERE room_id = ? AND finished_unix_ms IS NOT NULL ORDER BY started_unix_ms DESC, rowid DESC LIMIT 1`, roomID))
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+		if err == nil {
+			current := record.State
+			if err = finishCurrentTrackTx(ctx, tx, roomID, record, now, online); err != nil {
+				return err
+			}
+			if current.CurrentTrack != nil {
+				id, err := domain.NewID()
+				if err != nil {
+					return err
+				}
+				trackJSON, err := json.Marshal(current.CurrentTrack)
+				if err != nil {
+					return err
+				}
+				if err = shiftQueueTx(ctx, tx, roomID); err != nil {
+					return err
+				}
+				if _, err = tx.ExecContext(ctx, `INSERT INTO queue(queue_id, room_id, position, track_json, contributor_username, contributor_display_name, created_unix_ms)
+     VALUES (?, ?, 1, ?, ?, ?, ?)`, id, roomID, string(trackJSON), current.Contributor, current.ContributorName, unixMillis(now)); err != nil {
+					return err
+				}
+			}
+			record.State.CurrentTrack = &previous.Track
+			record.State.Contributor, record.State.ContributorName = previous.Contributor, previous.ContributorName
+			record.LastContributor = previous.Contributor
+			if err = startCurrentHistoryTx(ctx, tx, roomID, record, now); err != nil {
+				return err
+			}
+		} else if record.State.CurrentTrack == nil {
+			return domain.NewError(409, "no_current_track", "No track is loaded")
+		}
+	}
+	record.State.PositionSeconds = 0
+	record.State.PausedForEmpty = false
+	if record.State.Status == domain.PlaybackPlaying {
+		record.State.AnchorServerTime = timePointer(now)
+	} else {
+		record.State.Status = domain.PlaybackPaused
+		record.State.AnchorServerTime = nil
+	}
+	return nil
 }

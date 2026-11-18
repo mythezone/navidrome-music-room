@@ -21,8 +21,62 @@
     "roomID": "7f3b8ed58db14fd689217c177cbca60e",
     "serverTime": "2026-09-01T10:03:11Z",
     "payload": {
-      "onlineUsernames": ["admin", "listener"],
+      "onlineUsernames": [
+        "admin",
+        "listener"
+      ],
       "onlineCount": 2
+    }
+  },
+  {
+    "type": "chat_message",
+    "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+    "serverTime": "2026-11-18T10:00:00Z",
+    "payload": {
+      "messageID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+      "senderUsername": "listener",
+      "senderDisplayName": "Listener",
+      "messageType": "chat",
+      "body": "Great track!",
+      "stickerID": "vibes:music",
+      "replyToID": "",
+      "mentions": [],
+      "references": [],
+      "createdAt": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "type": "wish_updated",
+    "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+    "serverTime": "2026-11-18T10:00:00Z",
+    "payload": {
+      "wishID": "cccccccccccccccccccccccccccccccc",
+      "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+      "authorUsername": "listener",
+      "authorDisplayName": "Listener",
+      "kind": "album",
+      "title": "Example Album",
+      "artist": "Example Artist",
+      "reason": "For our next session",
+      "status": "pending",
+      "fulfilledBy": "",
+      "fulfilledByName": "",
+      "responseNote": "",
+      "resources": [],
+      "createdAt": "2026-11-18T10:00:00Z",
+      "updatedAt": "2026-11-18T10:00:00Z"
+    }
+  },
+  {
+    "type": "update_available",
+    "roomID": "7f3b8ed58db14fd689217c177cbca60e",
+    "serverTime": "2026-11-18T10:00:00Z",
+    "payload": {
+      "currentVersion": "1.2.0",
+      "latestVersion": "v1.2.1",
+      "channel": "stable",
+      "releaseURL": "https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.1"
     }
   }
 ]

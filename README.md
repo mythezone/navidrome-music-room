@@ -8,7 +8,7 @@
 <sub>Create in Navidrome · share one link or QR code · listen together on desktop and mobile</sub></p>
 
 <p align="center">
-  <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev"><img alt="Version" src="https://img.shields.io/badge/version-v1.1.0--dev-ff6b57"></a>
+  <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.0"><img alt="Version" src="https://img.shields.io/badge/version-v1.2.0-ff6b57"></a>
   <a href="https://github.com/mythezone/navidrome-music-room/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/mythezone/navidrome-music-room?include_prereleases&sort=semver"></a>
   <a href="https://github.com/mythezone/navidrome-music-room/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/mythezone/navidrome-music-room/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/mythezone/navidrome-music-room/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/mythezone/navidrome-music-room/actions/workflows/codeql.yml/badge.svg"></a>
@@ -20,7 +20,7 @@
   <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen"></a>
 </p>
 
-<p align="center"><strong><a href="README.zh-CN.md">简体中文</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">Download v1.1.0-dev</a> · <a href="#quick-install">Quick install</a> · <a href="#use-the-room">User guide</a></strong></p>
+<p align="center"><strong><a href="README.zh-CN.md">简体中文</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">Download v1.2.0</a> · <a href="#quick-install">Quick install</a> · <a href="#use-the-room">User guide</a></strong></p>
 
 <p align="center"><img src="docs/assets/hero.png" width="100%" alt="Navidrome Music Room across a self-hosted server, desktop and mobile" /></p>
 
@@ -32,7 +32,7 @@
   </tr>
 </table>
 
-Everyone signs in with their own Navidrome account and keeps their own library permissions. Music streams directly from Navidrome; the room synchronizes play, pause, seek, next track, requests and reconnect state. Current prerelease **v1.1.0-dev** adds complete **Songs / Albums / Artists** browsing and whole-album requests in the Web room.
+Everyone signs in with their own Navidrome account and keeps their own library permissions. Music streams directly from Navidrome; the room synchronizes play, pause, seek, next track, requests and reconnect state. **v1.2.0** adds seven languages, collaborative skipping, group chat, community statistics and achievements, song wishes, an immersive player, and browser-managed signed upgrades. All are available under GPL-3.0.
 
 ## Where it is useful
 
@@ -47,7 +47,7 @@ Everyone signs in with their own Navidrome account and keeps their own library p
 
 ## What works
 
-| Experience | v1.1.0-dev |
+| Experience | v1.2.0 |
 |---|---|
 | Create, edit, close, reopen and delete rooms | ✅ |
 | Share HTTPS invite, MusicMate deep link and local QR code | ✅ |
@@ -58,11 +58,19 @@ Everyone signs in with their own Navidrome account and keeps their own library p
 | Request a whole album | ✅ |
 | Search, favourites, playlists, cover art and lyrics | ✅ |
 | Direct Navidrome streaming with each user's own access | ✅ |
-| Chat, richer room activity and community statistics | Open-source roadmap |
+| Multi-language room and console (`en`, `zh-CN`, `zh-TW`, `ja`, `es`, `fr`, `de`) | ✅ |
+| Member track skipping and contributor self-skip | ✅ |
+| Group Chat, mentions, replies and two sticker packs | ✅ |
+| Listening Statistics, period Rankings and activity clock | ✅ |
+| Ten Member Levels and unlockable Achievements/Badges | ✅ |
+| Song Wishes with pending/fulfilled workflow | ✅ |
+| Resizable/Immersive Player, expandable lyrics and five-band EQ | ✅ |
+| Queue drag reorder, Pin-to-Top, Shuffle, Random Fill and history re-queue | ✅ |
+| Web One-Click Upgrade, Rollback, Diagnostics and Auto Update Push | ✅ |
 
 ## Real product tour
 
-These captures come from the running v1.1.0-dev build and a real Navidrome library. The catalog shown here is filtered to Jay Chou; no mock albums or substituted cover art are used.
+These historical captures show the v1.1 interface with a real Navidrome library; v1.2 adds the controls and community features listed above. The catalog shown here is filtered to Jay Chou; no mock albums or substituted cover art are used.
 
 <p align="center">
   <img src="docs/assets/web-room-catalog-live.png" width="100%" alt="Real Jay Chou album results in the Navidrome Music Room request desk" /><br />
@@ -93,14 +101,14 @@ These captures come from the running v1.1.0-dev build and a real Navidrome libra
 
 ## Downloads
 
-The [v1.1.0-dev release](https://github.com/mythezone/navidrome-music-room/releases/tag/v1.1.0-dev) contains everything needed to install without compiling:
+The [v1.2.0 release](https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.0) contains everything needed to install without compiling:
 
 | File | Use |
 |---|---|
-| [`navidrome-music-room-compose-1.1.0-dev.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-compose-1.1.0-dev.tar.gz) | Recommended ready-to-run Navidrome + gateway Compose kit |
-| [`navidrome-music-room.ndp`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room.ndp) | Navidrome plugin package for an existing installation |
-| [`navidrome-music-room-linux-amd64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-linux-amd64.tar.gz) | Gateway and launcher for Linux x86-64 |
-| [`navidrome-music-room-linux-arm64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-linux-arm64.tar.gz) | Gateway and launcher for Linux ARM64 |
+| [`navidrome-music-room-compose-1.2.0.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-compose-1.2.0.tar.gz) | Recommended ready-to-run Navidrome + gateway Compose kit |
+| [`navidrome-music-room.ndp`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room.ndp) | Navidrome plugin package for an existing installation |
+| [`navidrome-music-room-linux-amd64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-linux-amd64.tar.gz) | Gateway and launcher for Linux x86-64 |
+| [`navidrome-music-room-linux-arm64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-linux-arm64.tar.gz) | Gateway and launcher for Linux ARM64 |
 
 Checksums, SPDX SBOMs, provenance and Sigstore bundles are attached to the same release.
 
@@ -109,9 +117,9 @@ Checksums, SPDX SBOMs, provenance and Sigstore bundles are attached to the same 
 Requirements: Linux amd64/arm64, Docker Engine, Docker Compose v2 and writable Navidrome data, music and plugin directories.
 
 ```bash
-curl -LO https://github.com/mythezone/navidrome-music-room/releases/download/v1.1.0-dev/navidrome-music-room-compose-1.1.0-dev.tar.gz
-tar -xzf navidrome-music-room-compose-1.1.0-dev.tar.gz
-cd navidrome-music-room-1.1.0-dev
+curl -LO https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-compose-1.2.0.tar.gz
+tar -xzf navidrome-music-room-compose-1.2.0.tar.gz
+cd navidrome-music-room-1.2.0
 cp .env.example .env
 ```
 
@@ -207,7 +215,17 @@ These views call the standard OpenSubsonic library methods (`getRandomSongs`, `g
 
 ### Listen together
 
-Each browser must click **Start listening** once because of browser autoplay rules. After that, the room owner or a Navidrome administrator controls shared play, pause, seek and next-track state. All clients calculate position from the gateway's authoritative timestamp, repair drift, preload the next track and recover the latest snapshot after refresh or network interruption.
+Each browser must click **Start listening** once because of browser autoplay rules. The room owner or a Navidrome administrator controls shared play, pause, seek and previous-track state. Members can skip by default; managers can change **Allow member skipping** in the Admin Console or in-room settings. Even when it is disabled, a contributor can skip their own current track. A member's play/pause button controls local listening. All clients calculate position from the gateway's authoritative timestamp, repair drift, preload the next track and recover the latest snapshot after refresh or network interruption.
+
+Drag the desktop divider to resize the player, or click its artwork for immersive mode with auto-scrolling, expandable lyrics. The five-band equalizer supports presets and custom gains; mobile touch devices bypass it to keep native background audio. Favorites separates Songs, Albums, Artists and Playlists, while queue/history controls offer reorder, pin, shuffle, random fill and re-queue according to room permissions.
+
+### Chat and room information
+
+Open **Chat** for member/song mentions, playable library references, quick track reviews, replies and two localized sticker packs. Senders can recall a message within five minutes; managers can delete messages. Hidden chat tabs show unread counts.
+
+Open **Room Information** for listening statistics, Top DJs/Listeners/Chatters/Artists/Albums/Tracks, and the 24-hour activity clock. Periods use UTC calendar day, week, month, year or all time. Member profiles show ten progression levels and unlockable badges. **Song Wishes** lets members request missing tracks, albums or artists; managers mark them fulfilled with library resource attachments.
+
+The room and console detect Navidrome/browser language automatically. Their language switchers save the choice as `nmr:locale` across visits.
 
 ## Can it add buttons to native song and album pages?
 
@@ -244,11 +262,23 @@ Back up that directory together with Navidrome. Removing the container or `.ndp`
 
 ## Update and troubleshooting
 
-Use **Check for updates → Upgrade now** in the administrator console. The signed updater downloads the matching release bundle, and the launcher backs up room data, switches the gateway and `.ndp` together, checks health, and restores the previous release if activation fails. For a manual/offline upgrade, follow [the update guide](docs/UPDATES.md) instead of replacing only the `.ndp`.
+For **Web Direct Upgrade**, sign in as an administrator and open **Settings → Plugins → Navidrome Music Room → Website → Upgrade now** (`/music-room/admin/`); click **Check for updates** first if needed. The signed updater downloads the matching release bundle, and the launcher backs up room data, switches the gateway and `.ndp` together, checks health, and restores the previous release if activation fails. The browser then automatically calls same-origin Navidrome `/api/plugin/rescan`, re-enables the plugin if necessary, and confirms both versions and the paired heartbeat. The same console provides rollback and redacted diagnostics. Automatic activation requires a launcher-managed deployment and an active Navidrome administrator login.
+
+**Push and scheduled update detection** are configured in the gateway environment (Compose `.env` or systemd environment file):
+
+```dotenv
+MUSIC_ROOM_AUTO_UPDATE_CHECK=true
+MUSIC_ROOM_UPDATE_CHECK_INTERVAL=6h
+MUSIC_ROOM_UPDATE_WEBHOOK_URL=
+```
+
+Restart the gateway after changing these settings. Scheduled checks begin about 25 seconds after startup and repeat every six hours by default. A newer GitHub Release produces admin-only room WebSocket update badges, a Navidrome plugin heartbeat log, and an optional JSON POST to the webhook URL. Detection does not install updates automatically. The plugin's stable/beta channel controls which releases are considered.
+
+For manual/offline upgrades and notification details, follow [the update guide](docs/UPDATES.md).
 
 - **Plugin is missing:** confirm `ND_PLUGINS_ENABLED=true`, the `/plugins` mount, and that `navidrome-music-room.ndp` exists there; then rescan plugins.
 - **Plugin lease expired:** verify the internal gateway URL, pairing token, enabled state and authorized-user selection; wait one heartbeat interval.
-- **No songs or albums:** update to v1.1.0-dev, grant the room's music-folder access, and reopen **Request music**.
+- **No songs or albums:** update to v1.2.0, grant the room's music-folder access, and reopen **Request music**.
 - **Browser is silent:** click **Start listening** once and inspect the direct Navidrome `stream` request.
 - **WebSocket disconnects:** confirm the reverse proxy forwards `Upgrade` and `Connection` for `/music-room/`.
 

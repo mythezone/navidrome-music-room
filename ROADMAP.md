@@ -36,9 +36,28 @@
   for the next MusicMate iOS and Android release.
 - Continue testing against stock Navidrome without a maintained fork.
 
+## v1.2
+
+- [x] Seven-language Web room and Admin Console with Navidrome/browser detection,
+  a persistent switcher, and localized errors.
+- [x] Default-on member skipping, contributor self-skip, per-room settings in both
+  consoles, and manager previous-track control.
+- [x] Real-time chat, member/song mentions, library references, quick reviews,
+  replies, recall/moderation, unread badges, and two localized sticker packs.
+- [x] Room Information with period statistics and leaderboards, a 24-hour activity
+  clock, ten member levels, achievements/badges, and pending/fulfilled song wishes.
+- [x] Resizable desktop layout, immersive artwork/lyrics mode, five-band EQ with
+  native mobile audio, queue reorder/pin/shuffle/random fill, paginated history
+  re-queue, and Songs/Albums/Artists/Playlists favorites.
+- [x] Web signed upgrade, rollback, diagnostics, and automatic same-origin
+  Navidrome plugin rescan/re-enable coordination.
+- [x] Scheduled SemVer update detection, admin-only WebSocket notices, optional
+  webhook push, and plugin heartbeat logging.
+- [x] v1.2.0 contracts and SQLite migration v5 for collaborative/community data.
+
 ## Later
 
 - Promote the console to a real Navidrome sidebar/player panel only after an official host extension point exists.
-- Add chat, richer room activity, accessibility improvements, and community statistics through public contributions.
+- Continue accessibility and richer room-activity improvements through public contributions.
 - Add native song and album context actions if Navidrome publishes a supported resource-action extension point.
 - Multi-node coordination only if real deployments justify Redis/consensus complexity.

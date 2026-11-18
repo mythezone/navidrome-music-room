@@ -1,4 +1,4 @@
-VERSION ?= 1.1.0-dev
+VERSION ?= 1.2.0
 DIST ?= ../dist
 
 .PHONY: build package clean
@@ -9,7 +9,7 @@ build:
 	@LC_ALL=C grep -aFq -- "$(VERSION)" $(DIST)/plugin/plugin.wasm || (echo "TinyGo did not inject plugin version $(VERSION)" >&2; exit 1)
 
 package: build
-	cp manifest.json $(DIST)/plugin/manifest.json
+	sed -E 's/"version": "[^"]+"/"version": "$(VERSION)"/' manifest.json > $(DIST)/plugin/manifest.json
 	cd $(DIST)/plugin && zip -q -FS ../navidrome-music-room.ndp manifest.json plugin.wasm
 
 clean:

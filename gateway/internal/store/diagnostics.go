@@ -35,6 +35,7 @@ func (s *Store) Diagnostics(ctx context.Context) (DiagnosticSummary, error) {
 	for _, table := range []string{
 		"rooms", "members", "invites", "queue", "playback_history",
 		"security_audit", "schema_migrations", "update_state",
+		"chat_messages", "room_wishes", "member_stats",
 	} {
 		var count int64
 		if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table).Scan(&count); err != nil {

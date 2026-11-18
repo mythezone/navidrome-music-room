@@ -47,7 +47,7 @@ services:
     build:
       context: .
       args:
-        VERSION: ${MUSIC_ROOM_VERSION:-1.1.0-dev}
+        VERSION: ${MUSIC_ROOM_VERSION:-1.2.0}
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
     depends_on:
@@ -65,9 +65,12 @@ services:
       MUSIC_ROOM_PLUGIN_INSTALL_DIR: /plugins
       MUSIC_ROOM_BOOTSTRAP_RELEASE_DIR: /opt/music-room/release
       MUSIC_ROOM_RELEASE_REPOSITORY: mythezone/navidrome-music-room
+      MUSIC_ROOM_AUTO_UPDATE_CHECK: ${MUSIC_ROOM_AUTO_UPDATE_CHECK:-true}
+      MUSIC_ROOM_UPDATE_CHECK_INTERVAL: ${MUSIC_ROOM_UPDATE_CHECK_INTERVAL:-6h}
+      MUSIC_ROOM_UPDATE_WEBHOOK_URL: ${MUSIC_ROOM_UPDATE_WEBHOOK_URL:-}
       MUSIC_ROOM_ALLOWED_ORIGINS: ${MUSIC_ROOM_ALLOWED_ORIGINS:-}
       MUSIC_ROOM_TRUST_PROXY: "true"
-      MUSIC_ROOM_VERSION: ${MUSIC_ROOM_VERSION:-1.1.0-dev}
+      MUSIC_ROOM_VERSION: ${MUSIC_ROOM_VERSION:-1.2.0}
       TZ: ${TZ:-UTC}
     volumes:
       - ${NAVIDROME_PLUGINS_PATH:-./data/plugins}:/plugins

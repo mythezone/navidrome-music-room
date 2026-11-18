@@ -342,12 +342,9 @@ const paused = (await gateway(`/rooms/${room.roomID}/playback`, {
 assert.equal(paused.status, 'paused')
 for (const client of websocketClients) client.socket.close()
 
-const planned = await gateway(`/rooms/${room.roomID}/chat`, {
-  token: memberToken,
-  expected: [501],
-})
-assert.equal(planned.payload.error?.code, 'feature_not_implemented')
-assert.equal(planned.payload.error?.details?.featureKey, 'chat')
+for (const feature of ['chat', 'statistics', 'rankings', 'achievements', 'wishes', 'stickers']) {
+  await gateway(`/rooms/${room.roomID}/${feature}`, { token: memberToken })
+}
 
 const noMediaProxy = await fetch(`${baseURL}${gatewayPrefix}/api/v1/stream`, {
   signal: AbortSignal.timeout(10_000),

@@ -19,6 +19,7 @@ import (
 	"github.com/mythezone/navidrome-music-room/gateway/internal/config"
 	"github.com/mythezone/navidrome-music-room/gateway/internal/domain"
 	"github.com/mythezone/navidrome-music-room/gateway/internal/store"
+	updatemanager "github.com/mythezone/navidrome-music-room/gateway/internal/update"
 )
 
 type apiFixture struct {
@@ -26,6 +27,7 @@ type apiFixture struct {
 	store             *store.Store
 	pairing           string
 	navidromeInternal string
+	api               *Server
 }
 
 func newAPIFixture(t *testing.T) apiFixture {
@@ -67,7 +69,7 @@ func newAPIFixture(t *testing.T) apiFixture {
 	}
 	httpServer := httptest.NewServer(server.Handler())
 	t.Cleanup(httpServer.Close)
-	fixture := apiFixture{server: httpServer, store: storage, pairing: pairing, navidromeInternal: internal.String()}
+	fixture := apiFixture{server: httpServer, store: storage, pairing: pairing, navidromeInternal: internal.String(), api: server}
 	fixture.syncPlugin(t)
 	return fixture
 }
@@ -474,8 +476,8 @@ func TestAdminInvitationAndMemberPermissions(t *testing.T) {
 	response.Body.Close()
 
 	response = fixture.request(t, http.MethodGet, "/api/v1/rooms/"+room.RoomID+"/chat", nil, memberToken)
-	if response.StatusCode != http.StatusNotImplemented {
-		t.Fatalf("chat should be reported as not implemented: %d %s", response.StatusCode, readBody(response))
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("chat should return a page: %d %s", response.StatusCode, readBody(response))
 	}
 	response.Body.Close()
 }
@@ -711,4 +713,330 @@ func readWebSocketEvent(t *testing.T, connection *websocket.Conn, wanted string)
 func readBody(response *http.Response) string {
 	body, _ := io.ReadAll(response.Body)
 	return string(body)
+}
+
+func (f apiFixture) expectJSON(t *testing.T, method, path, token string, body any, status int, target any) string {
+	t.Helper()
+	response := f.request(t, method, path, body, token)
+	defer response.Body.Close()
+	raw := readBody(response)
+	if response.StatusCode != status {
+		t.Fatalf("%s %s: got %d want %d: %s", method, path, response.StatusCode, status, raw)
+	}
+	if target != nil {
+		if err := json.Unmarshal([]byte(raw), target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return raw
+}
+
+func communityFixture(t *testing.T) (apiFixture, domain.Room, string, string) {
+	t.Helper()
+	f := newAPIFixture(t)
+	admin, member := f.exchange(t, "admin"), f.exchange(t, "member")
+	var room domain.Room
+	f.expectJSON(t, "POST", "/api/v1/rooms", admin, map[string]any{"name": "Community", "musicFolderIDs": []int{1}}, 201, &room)
+	if _, err := f.store.UpsertMember(t.Context(), room.RoomID, domain.User{Username: "member", DisplayName: "Member"}, "member", "admin", "member.joined"); err != nil {
+		t.Fatal(err)
+	}
+	return f, room, admin, member
+}
+
+func TestAdminRedirectAndCollaborativeEndpoints(t *testing.T) {
+	f, room, admin, member := communityFixture(t)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	response, err := client.Get(f.server.URL + "/admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 308 || response.Header.Get("Location") != "admin/" || response.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("admin redirect: %+v", response)
+	}
+	if !room.AllowMemberSkip || !room.Capabilities.Chat || !room.Capabilities.Achievements {
+		t.Fatalf("new defaults: %+v", room)
+	}
+	base := "/api/v1/rooms/" + room.RoomID
+	for _, endpoint := range []string{"chat", "statistics", "rankings", "achievements", "wishes", "stickers"} {
+		f.expectJSON(t, "GET", base+"/"+endpoint, member, nil, 200, nil)
+	}
+	var page domain.ChatPage
+	f.expectJSON(t, "GET", base+"/chat", member, nil, 200, &page)
+	if page.Messages == nil {
+		t.Fatal("messages serialized as null")
+	}
+	var stats domain.RoomStatistics
+	f.expectJSON(t, "GET", base+"/statistics", member, nil, 200, &stats)
+	if stats.TopTracks == nil || stats.TopArtists == nil || stats.TopAlbums == nil || len(stats.HourlyDistribution) != 24 {
+		t.Fatalf("empty stats: %+v", stats)
+	}
+	var ranks domain.RoomRankings
+	f.expectJSON(t, "GET", base+"/rankings", member, nil, 200, &ranks)
+	if ranks.Requested == nil || ranks.Listened == nil || ranks.Chat == nil {
+		t.Fatalf("null ranks: %+v", ranks)
+	}
+	outsider := f.exchange(t, "member2")
+	f.expectJSON(t, "GET", base+"/chat", outsider, nil, 403, nil)
+	f.expectJSON(t, "GET", base+"/members/member2/profile", member, nil, 404, nil)
+	f.expectJSON(t, "GET", base+"/statistics?period=bad", member, nil, 400, nil)
+	f.expectJSON(t, "GET", base+"/rankings?period=bad", member, nil, 400, nil)
+	f.expectJSON(t, "GET", base+"/wishes?status=bad", member, nil, 400, nil)
+	var packs struct {
+		Packs []domain.StickerPack `json:"packs"`
+	}
+	f.expectJSON(t, "GET", base+"/stickers", member, nil, 200, &packs)
+	if len(packs.Packs) != 2 {
+		t.Fatal("expected two packs")
+	}
+	for _, pack := range packs.Packs {
+		if len(pack.Stickers) != 8 {
+			t.Fatal("expected eight stickers")
+		}
+		for _, sticker := range pack.Stickers {
+			if len(sticker.Labels) != 7 {
+				t.Fatalf("missing labels: %+v", sticker)
+			}
+		}
+	}
+	var snapshot domain.Snapshot
+	f.expectJSON(t, "GET", base+"/snapshot", member, nil, 200, &snapshot)
+	if snapshot.Permissions.CanManage || snapshot.Permissions.CanControl || !snapshot.Permissions.CanSkip || snapshot.UpdateNotice != nil {
+		t.Fatalf("member permissions: %+v", snapshot)
+	}
+	f.expectJSON(t, "GET", base+"/snapshot", admin, nil, 200, &snapshot)
+	if !snapshot.Permissions.CanManage || !snapshot.Permissions.CanFulfillWish || !snapshot.Permissions.CanReorderQueue {
+		t.Fatalf("manager permissions: %+v", snapshot.Permissions)
+	}
+}
+
+func TestSkipPermissionsQueueEnhancementsAndRequeue(t *testing.T) {
+	f, room, admin, member := communityFixture(t)
+	base := "/api/v1/rooms/" + room.RoomID
+	track := map[string]any{"track": map[string]any{"id": "track-e2e", "musicFolderID": 1}}
+	var snapshot domain.Snapshot
+	getState := func() domain.PlaybackState {
+		t.Helper()
+		f.expectJSON(t, "GET", base+"/snapshot", admin, nil, 200, &snapshot)
+		return snapshot.Playback
+	}
+	command := func(token, command string, want int) string {
+		t.Helper()
+		state := getState()
+		return f.expectJSON(t, "POST", base+"/playback", token, map[string]any{"command": command, "expectedRevision": state.Revision}, want, nil)
+	}
+	for _, cmd := range []string{"play", "pause", "seek", "previous", "stop"} {
+		if !strings.Contains(command(member, cmd, 403), "room_manager_required") {
+			t.Fatal("wrong manager error")
+		}
+	}
+	f.expectJSON(t, "POST", base+"/queue/tracks", admin, track, 201, nil)
+	f.expectJSON(t, "POST", base+"/queue/tracks", member, track, 201, nil)
+	command(member, "next", 200)
+	f.expectJSON(t, "PATCH", base, admin, map[string]any{"allowMemberSkip": false}, 200, nil)
+	command(member, "next", 200) // The member contributed the current track.
+	f.expectJSON(t, "POST", base+"/queue/tracks", admin, track, 201, nil)
+	if !strings.Contains(command(member, "next", 403), "skip_permission_required") {
+		t.Fatal("wrong skip error")
+	}
+	var memberSnapshot domain.Snapshot
+	f.expectJSON(t, "GET", base+"/snapshot", member, nil, 200, &memberSnapshot)
+	if memberSnapshot.Permissions.CanSkip {
+		t.Fatal("snapshot grants disabled skip")
+	}
+	f.expectJSON(t, "POST", base+"/queue/tracks", member, map[string]any{"track": track["track"], "playNext": true}, 403, nil)
+	for range 3 {
+		f.expectJSON(t, "POST", base+"/queue/tracks", admin, track, 201, nil)
+	}
+	getState()
+	fixed := snapshot.Queue[0].QueueID
+	f.expectJSON(t, "POST", base+"/queue/shuffle", member, map[string]any{}, 403, nil)
+	var queue struct {
+		Queue []domain.QueueEntry `json:"queue"`
+	}
+	f.expectJSON(t, "POST", base+"/queue/shuffle", admin, map[string]any{}, 200, &queue)
+	if len(queue.Queue) != 3 || queue.Queue[0].QueueID != fixed {
+		t.Fatal("shuffle moved first queue entry")
+	}
+	top := queue.Queue[2].QueueID
+	f.expectJSON(t, "POST", base+"/queue/"+top+"/top", member, map[string]any{}, 403, nil)
+	f.expectJSON(t, "POST", base+"/queue/"+top+"/top", admin, map[string]any{}, 200, &queue)
+	if queue.Queue[0].QueueID != top {
+		t.Fatal("top did not move entry")
+	}
+	var mutation struct {
+		Entry domain.QueueEntry   `json:"entry"`
+		Queue []domain.QueueEntry `json:"queue"`
+	}
+	f.expectJSON(t, "POST", base+"/queue/tracks", admin, map[string]any{"track": track["track"], "playNext": true}, 201, &mutation)
+	if mutation.Queue[0].QueueID != mutation.Entry.QueueID {
+		t.Fatal("playNext not at front")
+	}
+	command(admin, "play", 200)
+	command(admin, "next", 200)
+	getState()
+	historyID := snapshot.History[0].HistoryID
+	f.expectJSON(t, "POST", base+"/history/"+historyID+"/requeue", member, map[string]any{}, 201, &mutation)
+	if mutation.Entry.Contributor != "member" {
+		t.Fatal("requeue retains old contributor")
+	}
+	f.expectJSON(t, "PATCH", base, admin, map[string]any{"musicFolderIDs": []int{2}}, 200, nil)
+	f.expectJSON(t, "POST", base+"/history/"+historyID+"/requeue", member, map[string]any{}, 403, nil)
+	f.expectJSON(t, "POST", base+"/close", admin, map[string]any{}, 200, nil)
+	f.expectJSON(t, "POST", base+"/history/"+historyID+"/requeue", member, map[string]any{}, 409, nil)
+}
+
+func TestChatWishBroadcastsAndRateLimit(t *testing.T) {
+	f, room, admin, member := communityFixture(t)
+	base := "/api/v1/rooms/" + room.RoomID
+	connection := f.connectWebSocket(t, room.RoomID, member)
+	defer connection.Close()
+	readWebSocketEvent(t, connection, "snapshot")
+	f.expectJSON(t, "POST", base+"/chat", member, map[string]any{"body": " "}, 400, nil)
+	f.expectJSON(t, "POST", base+"/chat", member, map[string]any{"stickerID": "unknown"}, 400, nil)
+	f.expectJSON(t, "POST", base+"/chat", member, map[string]any{"messageType": "system", "body": "hi"}, 400, nil)
+	f.expectJSON(t, "POST", base+"/chat", member, map[string]any{"body": "hi", "references": []any{map[string]any{"kind": "bad", "id": "a", "title": "A"}}}, 400, nil)
+	var msg domain.ChatMessage
+	f.expectJSON(t, "POST", base+"/chat", member, map[string]any{"body": "hello", "mentions": []string{"ADMIN"}, "stickerID": "vibes:music"}, 201, &msg)
+	event := readWebSocketEvent(t, connection, "chat_message")
+	if !strings.Contains(string(event.Payload), msg.MessageID) || msg.Mentions[0] != "admin" {
+		t.Fatalf("chat broadcast: %s", event.Payload)
+	}
+	var reply domain.ChatMessage
+	f.expectJSON(t, "POST", base+"/chat", admin, map[string]any{"messageType": "review", "references": []domain.ChatReference{{Kind: "track", ID: "track-e2e", Title: "Track"}}, "replyToID": msg.MessageID}, 201, &reply)
+	if reply.ReplyPreview == nil || reply.ReplyPreview.Body != "hello" {
+		t.Fatal("missing reply preview")
+	}
+	f.expectJSON(t, "POST", base+"/chat/"+msg.MessageID+"/recall", admin, map[string]any{}, 403, nil)
+	f.expectJSON(t, "POST", base+"/chat/"+msg.MessageID+"/recall", member, map[string]any{}, 200, &msg)
+	event = readWebSocketEvent(t, connection, "chat_updated")
+	if msg.Body != "" || msg.StickerID != "" || len(msg.Mentions) != 0 || !strings.Contains(string(event.Payload), "recalledAt") {
+		t.Fatal("recall content not cleared")
+	}
+	f.expectJSON(t, "DELETE", base+"/chat/"+reply.MessageID, member, nil, 403, nil)
+	f.expectJSON(t, "DELETE", base+"/chat/"+msg.MessageID, admin, nil, 204, nil)
+	readWebSocketEvent(t, connection, "chat_updated")
+	var wish domain.Wish
+	f.expectJSON(t, "POST", base+"/wishes", member, map[string]any{"kind": "album", "title": "New album"}, 201, &wish)
+	readWebSocketEvent(t, connection, "wish_updated")
+	if wish.Resources == nil {
+		t.Fatal("wish resources null")
+	}
+	f.expectJSON(t, "POST", base+"/wishes/"+wish.WishID+"/fulfill", member, map[string]any{}, 403, nil)
+	f.expectJSON(t, "POST", base+"/wishes/"+wish.WishID+"/fulfill", admin, map[string]any{"resources": []domain.WishResource{{Title: "Unsafe", URL: "javascript:alert(1)"}}}, 400, nil)
+	f.expectJSON(t, "POST", base+"/wishes/"+wish.WishID+"/fulfill", admin, map[string]any{"responseNote": "Ready"}, 200, &wish)
+	readWebSocketEvent(t, connection, "wish_updated")
+	f.expectJSON(t, "DELETE", base+"/wishes/"+wish.WishID, member, nil, 403, nil)
+	f.expectJSON(t, "DELETE", base+"/wishes/"+wish.WishID, admin, nil, 204, nil)
+	readWebSocketEvent(t, connection, "wish_deleted")
+	for range 19 {
+		f.expectJSON(t, "POST", base+"/chat", member, map[string]any{"body": "participating"}, 201, nil)
+	}
+	if raw := f.expectJSON(t, "POST", base+"/chat", member, map[string]any{"body": "over limit"}, 429, nil); !strings.Contains(raw, "chat_rate_limited") {
+		t.Fatal(raw)
+	}
+	var profile domain.MemberProfile
+	f.expectJSON(t, "GET", base+"/achievements", member, nil, 200, &profile)
+	if profile.Stats.ChatCount != 20 {
+		t.Fatalf("chat stats: %+v", profile)
+	}
+	f.expectJSON(t, "PUT", base+"/achievements/selected", member, map[string]any{"badgeID": "chat_50"}, 400, nil)
+	f.expectJSON(t, "PUT", base+"/achievements/selected", member, map[string]any{"badgeID": "chat_10"}, 200, &profile)
+	if profile.SelectedBadgeID != "chat_10" {
+		t.Fatal("badge not persisted")
+	}
+}
+
+func TestUpdateNoticeIsAdminOnlyAndNotifiedOnce(t *testing.T) {
+	f, room, admin, member := communityFixture(t)
+	manager, err := updatemanager.NewManager(updatemanager.Config{Repository: "mythezone/navidrome-music-room", CurrentVersion: "1.1.0", DataDir: f.api.config.DataDir, CosignBinary: "cosign", TrustedRoot: "root", IdentityRegex: "identity"}, f.store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.api.updater = manager
+	status := updatemanager.Status{CurrentVersion: "1.1.0", LatestVersion: "v1.2.0", Channel: "stable", UpdateAvailable: true, ReleaseURL: "https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.0", PublishedAt: "2026-11-18T00:00:00Z"}
+	if err = f.store.PutUpdateState(t.Context(), "status", status); err != nil {
+		t.Fatal(err)
+	}
+	base := "/api/v1/rooms/" + room.RoomID
+	var snapshot domain.Snapshot
+	f.expectJSON(t, "GET", base+"/snapshot", admin, nil, 200, &snapshot)
+	if snapshot.UpdateNotice == nil || snapshot.UpdateNotice.LatestVersion != "v1.2.0" {
+		t.Fatal("missing admin notice")
+	}
+	snapshot = domain.Snapshot{}
+	f.expectJSON(t, "GET", base+"/snapshot", member, nil, 200, &snapshot)
+	if snapshot.UpdateNotice != nil {
+		t.Fatal("update notice leaked to member")
+	}
+	f.expectJSON(t, "GET", "/api/v1/admin/updates", member, nil, 403, nil)
+	var updates struct {
+		PluginVersion   string `json:"pluginVersion"`
+		PluginPaired    bool   `json:"pluginPaired"`
+		VersionMismatch bool   `json:"versionMismatch"`
+	}
+	f.expectJSON(t, "GET", "/api/v1/admin/updates", admin, nil, 200, &updates)
+	if !updates.PluginPaired || updates.VersionMismatch || updates.PluginVersion != "test" {
+		t.Fatalf("plugin status: %+v", updates)
+	}
+	var syncResponse map[string]any
+	f.expectJSON(t, "POST", "/internal/v1/plugin-sync", f.pairing, domain.PluginSync{PluginVersion: "v1.2.0", Generation: 2, NavidromeInternalURL: f.navidromeInternal, UpdateChannel: "stable", Users: []domain.PluginUser{{Username: "admin", Admin: true}, {Username: "member"}}}, 200, &syncResponse)
+	if syncResponse["updateAvailable"] != true || syncResponse["latestVersion"] != "v1.2.0" {
+		t.Fatalf("sync status: %+v", syncResponse)
+	}
+	f.expectJSON(t, "GET", "/api/v1/admin/updates", admin, nil, 200, &updates)
+	if !updates.VersionMismatch {
+		t.Fatal("version mismatch not reported")
+	}
+	adminWS := f.connectWebSocket(t, room.RoomID, admin)
+	defer adminWS.Close()
+	memberWS := f.connectWebSocket(t, room.RoomID, member)
+	defer memberWS.Close()
+	readWebSocketEvent(t, adminWS, "snapshot")
+	readWebSocketEvent(t, memberWS, "snapshot")
+	received := make(chan map[string]string, 2)
+	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Error(err)
+		}
+		received <- payload
+		w.WriteHeader(204)
+	}))
+	defer webhook.Close()
+	f.api.config.UpdateWebhookURL = webhook.URL
+	if err = f.api.notifyUpdate(t.Context(), status); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.api.notifyUpdate(t.Context(), status); err != nil {
+		t.Fatal(err)
+	}
+	readWebSocketEvent(t, adminWS, "update_available")
+	f.api.hub.Broadcast(room.RoomID, domain.Event{Type: "test_marker", Payload: map[string]any{}})
+	for {
+		memberWS.SetReadDeadline(time.Now().Add(time.Second))
+		var event webSocketEvent
+		if err = memberWS.ReadJSON(&event); err != nil {
+			t.Fatal(err)
+		}
+		if event.Type == "update_available" {
+			t.Fatal("non-admin received update push")
+		}
+		if event.Type == "test_marker" {
+			break
+		}
+	}
+	if len(received) != 1 {
+		t.Fatalf("expected one webhook, got %d", len(received))
+	}
+	payload := <-received
+	if payload["event"] != "update_available" || payload["latestVersion"] != "v1.2.0" || payload["publishedAt"] != status.PublishedAt {
+		t.Fatalf("webhook: %+v", payload)
+	}
+	f.expectJSON(t, "POST", "/internal/v1/plugin-sync", f.pairing, domain.PluginSync{PluginVersion: "v1.2.0", Generation: 3, NavidromeInternalURL: f.navidromeInternal, UpdateChannel: "beta", Users: []domain.PluginUser{{Username: "admin", Admin: true}, {Username: "member"}}}, 200, nil)
+	select {
+	case <-f.api.updateChecks:
+	default:
+		t.Fatal("channel change did not schedule check")
+	}
 }

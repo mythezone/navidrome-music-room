@@ -1,3 +1,4 @@
+import { errorText, t } from './i18n'
 import type {
   CatalogResults,
   LyricLine,
@@ -55,14 +56,14 @@ export class SubsonicClient {
     const body = (await response.json().catch(() => ({}))) as SubsonicEnvelope
     const envelope = body['subsonic-response'] || {}
     if (!response.ok || envelope.status !== 'ok') {
-      throw new SubsonicError(envelope.error?.message || `Navidrome 请求失败 (${response.status})`)
+      throw new SubsonicError(errorText('subsonic_failed'))
     }
     return envelope
   }
 
   assertSameOrigin(origin = window.location.origin): void {
     if (new URL(this.baseURL, origin).origin !== origin) {
-      throw new SubsonicError('Web 听歌房要求 Navidrome 与房间网关使用同一个公开域名', 'same_origin_required')
+      throw new SubsonicError(errorText('same_origin_required'), 'same_origin_required')
     }
   }
 
@@ -70,7 +71,7 @@ export class SubsonicClient {
     const result = await this.request('getMusicFolders')
     return list<Record<string, unknown>>(result.musicFolders?.musicFolder).map((folder) => ({
       id: Number(folder.id),
-      name: String(folder.name || `音乐库 ${folder.id}`),
+      name: String(folder.name || String(folder.id)),
     }))
   }
 
@@ -105,6 +106,27 @@ export class SubsonicClient {
       albums: list<SubsonicAlbum>(search.album),
       artists: list<SubsonicArtist>(search.artist),
     }
+  }
+
+  async randomSongs(folderID: number, size = 20): Promise<SubsonicSong[]> {
+    const result = await this.request('getRandomSongs', { musicFolderId: folderID, size })
+    return list<SubsonicSong>(result.randomSongs?.song)
+  }
+
+  async searchSongs(query: string, folderID: number): Promise<SubsonicSong[]> {
+    return (await this.search(query, folderID)).songs
+  }
+
+  async searchAlbums(query: string, folderID: number): Promise<SubsonicAlbum[]> {
+    return (await this.search(query, folderID)).albums
+  }
+
+  async searchArtists(query: string, folderID: number): Promise<SubsonicArtist[]> {
+    return (await this.search(query, folderID)).artists
+  }
+
+  async song(id: string): Promise<SubsonicSong> {
+    return (await this.request('getSong', { id })).song as SubsonicSong
   }
 
   async album(albumID: string): Promise<SubsonicAlbum> {
@@ -174,11 +196,11 @@ export class SubsonicClient {
   toTrack(song: SubsonicSong, musicFolderID: number): TrackRef {
     return {
       id: song.id,
-      musicFolderID,
+      musicFolderID: song.musicFolderId || musicFolderID,
       albumID: song.albumId,
-      title: song.title || '未知歌曲',
-      artist: song.artist || '未知歌手',
-      album: song.album || '未知专辑',
+      title: song.title || t('unknownSong'),
+      artist: song.artist || t('unknownArtist'),
+      album: song.album || t('unknownAlbum'),
       durationSeconds: Number(song.duration || 0),
       coverArtID: song.coverArt,
     }

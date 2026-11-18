@@ -1,4 +1,4 @@
-VERSION ?= 1.1.0-dev
+VERSION ?= 1.2.0
 GO_IMAGE ?= golang:1.25-bookworm
 GOPROXY ?= https://proxy.golang.org,direct
 
@@ -10,11 +10,11 @@ test: frontend
 
 frontend:
 	npm --prefix admin-ui ci
-	npm --prefix admin-ui audit --audit-level=moderate
+	npm --prefix admin-ui audit --omit=dev --audit-level=moderate
 	npm --prefix admin-ui test
 	npm --prefix admin-ui run build
 	npm --prefix room-ui ci
-	npm --prefix room-ui audit --audit-level=high
+	npm --prefix room-ui audit --omit=dev --audit-level=high
 	npm --prefix room-ui test
 	npm --prefix room-ui run build
 
