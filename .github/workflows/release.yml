@@ -29,7 +29,7 @@ jobs:
       - run: ./script/build-plugin.sh "${GITHUB_REF_NAME}"
       - run: docker run --rm -v "$PWD/dist:/dist:ro" deluan/navidrome:0.63.2 plugin validate /dist/navidrome-music-room.ndp
       - run: docker run --rm -v "$PWD/dist:/dist:ro" deluan/navidrome:latest plugin validate /dist/navidrome-music-room.ndp
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plugin
           path: dist/navidrome-music-room.ndp
@@ -82,7 +82,7 @@ jobs:
           COSIGN_BINARY="$cosign_dir/cosign" \
             SIGSTORE_TRUSTED_ROOT="$PWD/deploy/sigstore/trusted_root.json" \
             ./script/package-release.sh "${{ matrix.arch }}" "${GITHUB_REF_NAME}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bundle-${{ matrix.arch }}
           path: dist/navidrome-music-room-linux-${{ matrix.arch }}.tar.gz
