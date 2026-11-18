@@ -17,12 +17,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           cache-dependency-path: plugin/go.sum
       - name: Install verified TinyGo
         run: |
-          curl --http1.1 -fsSL --retry 5 --retry-all-errors -o /tmp/tinygo.tar.gz https://github.com/tinygo-org/tinygo/releases/download/v0.41.1/tinygo0.41.1.linux-amd64.tar.gz
-          echo 'e156d1d93a376eef639a4143d13be07e8c463fb6cf2d7d447698ed4474d23e91  /tmp/tinygo.tar.gz' | sha256sum -c -
+          curl --http1.1 -fsSL --retry 5 --retry-all-errors -o /tmp/tinygo.tar.gz https://github.com/tinygo-org/tinygo/releases/download/v0.44.0/tinygo0.44.0.linux-amd64.tar.gz
+          echo 'ed0f45543a49ff2a99120a5a1b8814a0750e1fda1a66f8e2a0a172576134aaf9  /tmp/tinygo.tar.gz' | sha256sum -c -
           sudo mkdir -p /opt/tinygo
           sudo tar -xzf /tmp/tinygo.tar.gz -C /opt/tinygo --strip-components=1
           echo /opt/tinygo/bin >> "$GITHUB_PATH"
@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           cache-dependency-path: gateway/go.sum
       - uses: actions/setup-node@v4
         with:
@@ -140,8 +140,18 @@ jobs:
       - uses: actions/attest-build-provenance@v3
         with:
           subject-path: "release/*"
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { flag=1; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > "${RUNNER_TEMP}/release-notes.md"
+          test -s "${RUNNER_TEMP}/release-notes.md"
       - uses: softprops/action-gh-release@v2
         with:
+          body_path: ${{ runner.temp }}/release-notes.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: release/*

@@ -1,6 +1,6 @@
 module github.com/mythezone/navidrome-music-room/plugin
 
-go 1.25
+go 1.26.11
 
 require (
 	github.com/navidrome/navidrome/plugins/pdk/go v0.0.0-20260711131814-be10f89c1179

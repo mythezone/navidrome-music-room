@@ -47,7 +47,7 @@ services:
     build:
       context: .
       args:
-        VERSION: ${MUSIC_ROOM_VERSION:-1.2.0}
+        VERSION: ${MUSIC_ROOM_VERSION:-1.2.1}
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
     depends_on:
@@ -70,7 +70,7 @@ services:
       MUSIC_ROOM_UPDATE_WEBHOOK_URL: ${MUSIC_ROOM_UPDATE_WEBHOOK_URL:-}
       MUSIC_ROOM_ALLOWED_ORIGINS: ${MUSIC_ROOM_ALLOWED_ORIGINS:-}
       MUSIC_ROOM_TRUST_PROXY: "true"
-      MUSIC_ROOM_VERSION: ${MUSIC_ROOM_VERSION:-1.2.0}
+      MUSIC_ROOM_VERSION: ${MUSIC_ROOM_VERSION:-1.2.1}
       TZ: ${TZ:-UTC}
     volumes:
       - ${NAVIDROME_PLUGINS_PATH:-./data/plugins}:/plugins

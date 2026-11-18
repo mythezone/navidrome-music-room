@@ -1,5 +1,5 @@
-VERSION ?= 1.2.0
-GO_IMAGE ?= golang:1.25-bookworm
+VERSION ?= 1.2.1
+GO_IMAGE ?= golang:1.26-bookworm
 GOPROXY ?= https://proxy.golang.org,direct
 
 .PHONY: test frontend race vet plugin build validate-plugin validate-openapi validate-compose clean

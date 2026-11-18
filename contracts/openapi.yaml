@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Navidrome Music Room Gateway API
-  version: 1.2.0
+  version: 1.2.1
   license:
     name: GPL-3.0-only
     identifier: GPL-3.0-only

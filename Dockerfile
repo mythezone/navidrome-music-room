@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.12
-ARG GO_IMAGE=golang:1.25-bookworm
+ARG GO_IMAGE=golang:1.26-bookworm
 ARG NODE_IMAGE=node:22-bookworm-slim
 ARG COSIGN_IMAGE=ghcr.io/sigstore/cosign/cosign@sha256:d91bc4e7e95e8d2f549c747a72dc174f90579e410a1695f57f686674f84ce849
-ARG PLUGIN_BUILD_IMAGE=golang:1.25-bookworm
+ARG PLUGIN_BUILD_IMAGE=golang:1.26-bookworm
 
-FROM ${NODE_IMAGE} AS admin-ui-build
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS admin-ui-build
 WORKDIR /src/admin-ui
 COPY admin-ui/package.json admin-ui/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
@@ -12,7 +12,7 @@ COPY admin-ui/index.html admin-ui/vite.config.js ./
 COPY admin-ui/src/ ./src/
 RUN ADMIN_UI_OUT_DIR=/out npm run build
 
-FROM ${NODE_IMAGE} AS room-ui-build
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS room-ui-build
 WORKDIR /src/room-ui
 COPY room-ui/package.json room-ui/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
@@ -20,10 +20,11 @@ COPY room-ui/index.html room-ui/tsconfig.json room-ui/vite.config.ts ./
 COPY room-ui/src/ ./src/
 RUN ROOM_UI_OUT_DIR=/out npm run build
 
-FROM ${GO_IMAGE} AS gateway-build
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS gateway-build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 ARG GOPROXY=https://proxy.golang.org,direct
+ENV GOTOOLCHAIN=auto
 WORKDIR /src/gateway
 COPY gateway/go.mod gateway/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod GOPROXY=${GOPROXY} go mod download
@@ -43,15 +44,15 @@ RUN --mount=type=cache,target=/go/pkg/mod go test ./...
 
 FROM --platform=$BUILDPLATFORM ${PLUGIN_BUILD_IMAGE} AS plugin-build
 USER root
-ARG VERSION=1.2.0
+ARG VERSION=1.2.1
 ARG BUILDARCH
-ARG TINYGO_VERSION=0.41.1
+ARG TINYGO_VERSION=0.44.0
 RUN if command -v tinygo >/dev/null 2>&1; then \
       tinygo version | grep -F "tinygo version ${TINYGO_VERSION} "; \
     else \
       case "${BUILDARCH}" in \
-        amd64) tinygo_sha=e156d1d93a376eef639a4143d13be07e8c463fb6cf2d7d447698ed4474d23e91 ;; \
-        arm64) tinygo_sha=789733bc3b5bace0bd1835a267b3ea267804a7ef1cfe69bc522c295f5226d624 ;; \
+        amd64) tinygo_sha=ed0f45543a49ff2a99120a5a1b8814a0750e1fda1a66f8e2a0a172576134aaf9 ;; \
+        arm64) tinygo_sha=48cece9e1e886a176caad0918182d90f8348ad3084774e6239f42e5e11e40990 ;; \
         *) echo "Unsupported TinyGo build architecture: ${BUILDARCH}" >&2; exit 1 ;; \
       esac && \
       curl --http1.1 -fsSL --retry 5 --retry-all-errors -o /tmp/tinygo.tar.gz \
@@ -62,6 +63,7 @@ RUN if command -v tinygo >/dev/null 2>&1; then \
     fi
 ENV PATH=/opt/tinygo/bin:$PATH
 ENV GOPATH=/go
+ENV GOTOOLCHAIN=auto
 WORKDIR /src/plugin
 ARG GOPROXY=https://proxy.golang.org,direct
 COPY plugin/go.mod plugin/go.sum ./
@@ -69,11 +71,12 @@ RUN --mount=type=cache,target=/go/pkg/mod GOPROXY=${GOPROXY} go mod download
 COPY plugin/ ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     normalized_version="${VERSION#v}" && \
-    GOFLAGS=-buildvcs=false tinygo build -target wasip1 -buildmode=c-shared -ldflags="-X main.version=${normalized_version}" -o /out/plugin.wasm . && \
+    go_root="$(go env GOROOT)" && \
+    GOROOT="${go_root}" PATH="${go_root}/bin:${PATH}" GOFLAGS=-buildvcs=false tinygo build -target wasip1 -buildmode=c-shared -ldflags="-X main.version=${normalized_version}" -o /out/plugin.wasm . && \
     LC_ALL=C grep -aFq -- "${normalized_version}" /out/plugin.wasm
 
-FROM debian:bookworm-slim AS ndp-build
-ARG VERSION=1.2.0
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS ndp-build
+ARG VERSION=1.2.1
 RUN apt-get update && apt-get install -y --no-install-recommends zip ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /out/plugin
 COPY plugin/manifest.json ./manifest.json
@@ -95,7 +98,7 @@ COPY --from=ndp-build /out/navidrome-music-room.ndp /navidrome-music-room.ndp
 COPY --from=ndp-build /out/release.json /release.json
 
 FROM debian:bookworm-slim
-ARG VERSION=1.2.0
+ARG VERSION=1.2.1
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
 COPY --from=gateway-build /out/music-room-launcher /usr/local/bin/music-room-launcher
 COPY --from=gateway-build /out/music-room-gateway /opt/music-room/release/music-room-gateway

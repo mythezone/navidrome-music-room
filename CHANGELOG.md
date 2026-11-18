@@ -4,6 +4,36 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-18
+
+### Security
+
+- Upgraded the Go toolchain from `1.25` to `1.26.11`
+  (`golang:1.26-bookworm`) and TinyGo from `0.41.1` to `0.44.0`, resolving
+  all Go 1.25 standard library `govulncheck` advisories (`GO-2026-6859`,
+  `GO-2026-6809`, `GO-2026-6603`–`GO-2026-6617`) across gateway, launcher,
+  and plugin builds.
+
+### Changed
+
+- Added `--platform=$BUILDPLATFORM` to the frontend, Go cross-compile, and
+  `.ndp` packaging stages in `Dockerfile` for fast native multi-arch builds.
+- Updated `.github/workflows/release.yml` to publish curated `CHANGELOG.md`
+  notes directly into GitHub Releases and Admin Console `releaseNotes`.
+
+### Highlights Included from 1.2.0
+
+- Seven-language internationalization in the Web Listening Room and Admin Console.
+- Collaborative track skipping through per-room `allowMemberSkip`.
+- Real-time Group Chat with playable references, replies, and localized stickers.
+- Room Information hub with Statistics, Leaderboards, Badges, and Song Wishes.
+- Immersive fullscreen lyrics and a five-band Web Audio equalizer.
+- Queue drag-reorder, Pin-to-Top, and Shuffle, plus four-tab Favorites.
+- In-browser one-click signed upgrades and rollback, with scheduled update
+  detection and WebSocket/webhook push notifications.
+- Fixed the Admin Console blank screen and prefix-preserving redirect
+  ([#8](https://github.com/mythezone/navidrome-music-room/issues/8)).
+
 ## [1.2.0] - 2026-11-18
 
 ### Added
@@ -152,7 +182,8 @@ beta.2; automatic updates are self-contained from beta.2 onward.
 - Signed GitHub Release staging, stable launcher activation, health rollback, Compose/systemd deployment, and OpenAPI/golden contracts.
 - MusicMate Navidrome link/provider compatibility types.
 
-[Unreleased]: https://github.com/mythezone/navidrome-music-room/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/mythezone/navidrome-music-room/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/mythezone/navidrome-music-room/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/mythezone/navidrome-music-room/compare/v1.1.0-dev...v1.2.0
 [1.1.0-dev]: https://github.com/mythezone/navidrome-music-room/compare/v1.0.0...v1.1.0-dev
 [1.0.0]: https://github.com/mythezone/navidrome-music-room/compare/v0.1.0-beta.3...v1.0.0

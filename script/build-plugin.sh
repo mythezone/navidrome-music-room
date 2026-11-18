@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-version=${1:-1.2.0}
+version=${1:-1.2.1}
 version=${version#v}
 root_dir=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 dist_dir=${DIST_DIR:-$root_dir/dist}
@@ -11,6 +11,10 @@ command -v zip >/dev/null 2>&1 || { echo "zip is required" >&2; exit 1; }
 
 mkdir -p "$dist_dir/plugin"
 cd "$root_dir/plugin"
+if command -v go >/dev/null 2>&1; then
+  go_root=$(go env GOROOT)
+  export GOROOT="$go_root" PATH="$go_root/bin:$PATH"
+fi
 GOFLAGS="${GOFLAGS:+$GOFLAGS }-buildvcs=false" tinygo build -target wasip1 -buildmode=c-shared -ldflags="-X main.version=$version" -o "$dist_dir/plugin/plugin.wasm" .
 if ! LC_ALL=C grep -aFq -- "$version" "$dist_dir/plugin/plugin.wasm"; then
   echo "TinyGo did not inject plugin version $version into plugin.wasm" >&2

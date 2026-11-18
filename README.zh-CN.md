@@ -8,7 +8,7 @@
 <sub>在 Navidrome 中创建 · 分享一个链接或二维码 · 电脑和手机一起听</sub></p>
 
 <p align="center">
-  <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.0"><img alt="版本" src="https://img.shields.io/badge/version-v1.2.0-ff6b57"></a>
+  <a href="https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.1"><img alt="版本" src="https://img.shields.io/badge/version-v1.2.1-ff6b57"></a>
   <a href="https://github.com/mythezone/navidrome-music-room/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/mythezone/navidrome-music-room?include_prereleases&sort=semver"></a>
   <a href="https://github.com/mythezone/navidrome-music-room/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/mythezone/navidrome-music-room/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/mythezone/navidrome-music-room/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/mythezone/navidrome-music-room/actions/workflows/codeql.yml/badge.svg"></a>
@@ -20,7 +20,7 @@
   <a href="CONTRIBUTING.md"><img alt="欢迎 PR" src="https://img.shields.io/badge/PRs-welcome-brightgreen"></a>
 </p>
 
-<p align="center"><strong><a href="README.md">English</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">下载 v1.2.0</a> · <a href="#快速安装">快速安装</a> · <a href="#使用听歌房">使用教程</a></strong></p>
+<p align="center"><strong><a href="README.md">English</a> · <a href="https://github.com/mythezone/navidrome-music-room/releases">下载 v1.2.1</a> · <a href="#快速安装">快速安装</a> · <a href="#使用听歌房">使用教程</a></strong></p>
 
 <p align="center"><img src="docs/assets/hero.png" width="100%" alt="自托管服务器、桌面与手机上的 Navidrome Music Room" /></p>
 
@@ -32,7 +32,7 @@
   </tr>
 </table>
 
-每个人都使用自己的 Navidrome 账号，并保持自己的曲库权限。音频直接从 Navidrome 播放，听歌房同步播放、暂停、进度、切歌、点播与断线重连。**v1.2.0** 新增七种语言、成员协作切歌、群聊、社区统计与成就、歌曲心愿、沉浸播放器和浏览器签名升级，均按 GPL-3.0 开源提供。
+每个人都使用自己的 Navidrome 账号，并保持自己的曲库权限。音频直接从 Navidrome 播放，听歌房同步播放、暂停、进度、切歌、点播与断线重连。**v1.2.x** 提供七种语言、成员协作切歌、群聊、社区统计与成就、歌曲心愿、沉浸播放器和浏览器签名升级，均按 GPL-3.0 开源提供。
 
 ## 适合这些场景
 
@@ -47,7 +47,7 @@
 
 ## 已实现功能
 
-| 使用体验 | v1.2.0 |
+| 使用体验 | v1.2.1 |
 |---|---|
 | 创建、修改、关闭、重开和删除房间 | ✅ |
 | 分享 HTTPS 邀请、MusicMate Deep Link 和本地二维码 | ✅ |
@@ -101,14 +101,14 @@
 
 ## 下载
 
-[v1.2.0 Release](https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.0) 会直接提供无需编译的安装文件：
+[v1.2.1 Release](https://github.com/mythezone/navidrome-music-room/releases/tag/v1.2.1) 会直接提供无需编译的安装文件：
 
 | 文件 | 用途 |
 |---|---|
-| [`navidrome-music-room-compose-1.2.0.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-compose-1.2.0.tar.gz) | 推荐；可直接启动的 Navidrome + 网关 Compose 安装包 |
-| [`navidrome-music-room.ndp`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room.ndp) | 给现有 Navidrome 使用的插件包 |
-| [`navidrome-music-room-linux-amd64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-linux-amd64.tar.gz) | Linux x86-64 网关与 launcher |
-| [`navidrome-music-room-linux-arm64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-linux-arm64.tar.gz) | Linux ARM64 网关与 launcher |
+| [`navidrome-music-room-compose-1.2.1.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.1/navidrome-music-room-compose-1.2.1.tar.gz) | 推荐；可直接启动的 Navidrome + 网关 Compose 安装包 |
+| [`navidrome-music-room.ndp`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.1/navidrome-music-room.ndp) | 给现有 Navidrome 使用的插件包 |
+| [`navidrome-music-room-linux-amd64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.1/navidrome-music-room-linux-amd64.tar.gz) | Linux x86-64 网关与 launcher |
+| [`navidrome-music-room-linux-arm64.tar.gz`](https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.1/navidrome-music-room-linux-arm64.tar.gz) | Linux ARM64 网关与 launcher |
 
 同一 Release 还包含校验和、SPDX SBOM、来源证明与 Sigstore 验证文件。
 
@@ -117,9 +117,9 @@
 需要 Linux amd64/arm64、Docker Engine、Docker Compose v2，以及可写的 Navidrome 数据、音乐和插件目录。
 
 ```bash
-curl -LO https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.0/navidrome-music-room-compose-1.2.0.tar.gz
-tar -xzf navidrome-music-room-compose-1.2.0.tar.gz
-cd navidrome-music-room-1.2.0
+curl -LO https://github.com/mythezone/navidrome-music-room/releases/download/v1.2.1/navidrome-music-room-compose-1.2.1.tar.gz
+tar -xzf navidrome-music-room-compose-1.2.1.tar.gz
+cd navidrome-music-room-1.2.1
 cp .env.example .env
 ```
 
@@ -278,7 +278,7 @@ MUSIC_ROOM_UPDATE_WEBHOOK_URL=
 
 - **插件列表里没有插件：**确认 `ND_PLUGINS_ENABLED=true`、`/plugins` 挂载正确，并且目录中存在 `navidrome-music-room.ndp`，然后重新扫描插件。
 - **插件租约过期：**检查网关内部地址、配对密钥、启用状态和用户授权，等待一个心跳周期。
-- **看不到歌曲或专辑：**升级到 v1.2.0，确认房间 music folder 权限，然后重新打开点歌台。
+- **看不到歌曲或专辑：**升级到 v1.2.1，确认房间 music folder 权限，然后重新打开点歌台。
 - **浏览器没有声音：**先点击一次 **开始收听**，再检查浏览器对 Navidrome `stream` 的直连请求。
 - **WebSocket 断开：**检查反向代理是否为 `/music-room/` 转发 `Upgrade` 与 `Connection`。
 

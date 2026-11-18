@@ -21,7 +21,7 @@ jobs:
           languages: go
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
       - working-directory: gateway
         run: go build ./...
       - working-directory: plugin
